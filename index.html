@@ -1,4 +1,16 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<!-- v3.108: 自前ホスト（GitHub Pagesなど、Artifactの外）でも正しく表示・
+     PWA化できるように、doctype/html/head/bodyや以下のPWA関連タグを追加した。
+     Artifact上で開いたときはArtifact側が周りを包んでくれていたため、これらが
+     無くても表示できていた。 -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>LifeCore</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#2F6F5E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -866,6 +878,8 @@
     *{animation-duration:.001s !important;transition-duration:.001s !important}
   }
 </style>
+</head>
+<body>
 
 <div class="app" id="app">
   <div class="header" id="header"></div>
@@ -893,7 +907,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.107";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.108";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -4250,3 +4264,5 @@ setInterval(()=>{
   }
 }, 60000);
 </script>
+</body>
+</html>

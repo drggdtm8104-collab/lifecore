@@ -1,4 +1,65 @@
-// LifeCore PWA診断用の最小Service Worker（v3.106のオフライン化検討で追加）。
-// キャッシュ処理は一切なく、「そもそも登録できるか」だけを確かめるためのもの。
-self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
+// LifeCore Service Worker — オフラインでもアプリの画面自体を開けるようにする。
+//
+// 更新のたびに CACHE_VERSION を変える（例: "v3.108" のようにAPP_VERSIONと合わせる）。
+// 変えないと、古いキャッシュがいつまでも使われ続けて新しい版が反映されない。
+const CACHE_VERSION = "v3.108";
+const CACHE_NAME = "lifecore-" + CACHE_VERSION;
+
+// 同一オリジンの、アプリを開くために最低限必要なファイルだけを事前キャッシュする。
+// Googleフォントは別オリジン（CORSの都合や、必ず取得できる保証がないため）で、
+// 取れなければブラウザの代替フォントで表示される——オフライン時の許容できる劣化。
+const APP_SHELL = [
+  "./",
+  "./index.html",
+  "./manifest.json",
+  "./icon-192.png",
+  "./icon-512.png",
+];
+
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).catch(() => {})
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      // v3.108より前の名前が付いたキャッシュ（旧バージョン）を掃除する
+      const names = await caches.keys();
+      await Promise.all(
+        names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n))
+      );
+      await self.clients.claim();
+    })()
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  if (req.method !== "GET") return;
+
+  // ページの読み込み（ナビゲーション）は「オンラインなら常に最新」を優先し、
+  // 取得できたときだけキャッシュを更新する（ネット優先・オフライン時のみキャッシュ）。
+  if (req.mode === "navigate") {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", copy)).catch(() => {});
+          return res;
+        })
+        .catch(() => caches.match("./index.html"))
+    );
+    return;
+  }
+
+  // それ以外の同一オリジンのGET（manifest・アイコンなど）はキャッシュ優先。
+  const url = new URL(req.url);
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      caches.match(req).then((cached) => cached || fetch(req))
+    );
+  }
+});
