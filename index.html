@@ -918,7 +918,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.114";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.115";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3127,6 +3127,17 @@ function renderSettings(){
     `<p>「今日」画面の上部に、その日の予定量が普段こなせる量に収まっているか・崩れやすい時間帯かを表示します。傾向タブの学習結果を使います。</p>
      <button class="btn ${settings().showOutlook!==false?"primary":""}" data-act="toggle-outlook">${settings().showOutlook!==false?"表示中（タップでオフ）":"非表示（タップでオン）"}</button>`);
 
+  // v3.115: プッシュ通知（Phase 1・試験提供）。今はまだ「毎朝8時ごろに固定の
+  // 文言で1通」だけ——タスクの内容などは外部（通知サーバー）に一切送らない。
+  html += setCard("push", "通知（試験提供）", ()=>{
+    if(!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window) || !window.isSecureContext){
+      return `<p>この環境では通知に対応していません（ホーム画面に追加したアプリとして開く必要があります）。</p>`;
+    }
+    const label = pushSubState==="on" ? "通知をオフにする" : pushSubState==="checking" ? "確認中…" : "通知を受け取る";
+    return `<p>毎朝8時ごろ、固定の文言（「今日のスケジュールを確認しましょう」）で通知します。タスクの内容などは送信・保存されません（Phase 1）。</p>
+     <button class="btn ${pushSubState==="on"?"primary":""}" data-act="toggle-push" ${pushSubState==="checking"?"disabled":""}>${label}</button>`;
+  });
+
   // ---- everything below is collapsed by default; each opens on its own ----
   html += setCard("sync", "同期・保存先", ()=>{
     const syncTxt = {
@@ -3846,6 +3857,43 @@ document.addEventListener("click", e=>{
       render(); break;
     }
     case "toggle-outlook": settings().showOutlook = (settings().showOutlook===false); save(); render(); break;
+    case "toggle-push": {
+      (async ()=>{
+        try{
+          if(pushSubState === "on"){
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            if(sub){
+              try{
+                await fetch(PUSH_SERVER + "/unsubscribe", {
+                  method:"POST", headers:{ "Content-Type":"application/json", "X-LifeCore-Token": PUSH_SHARED_TOKEN },
+                  body: JSON.stringify({ endpoint: sub.endpoint }),
+                });
+              }catch(e){}
+              await sub.unsubscribe();
+            }
+            pushSubState = "off"; render(); toast("通知をオフにしました");
+            return;
+          }
+          const perm = await Notification.requestPermission();
+          if(perm !== "granted"){ toast("通知が許可されませんでした"); return; }
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(PUSH_VAPID_PUBLIC_KEY),
+          });
+          await fetch(PUSH_SERVER + "/subscribe", {
+            method:"POST", headers:{ "Content-Type":"application/json", "X-LifeCore-Token": PUSH_SHARED_TOKEN },
+            body: JSON.stringify(sub.toJSON()),
+          });
+          pushSubState = "on"; render(); toast("通知をオンにしました");
+        }catch(e){
+          toast("通知の設定でエラーが発生しました: " + e.message);
+          dbg("[push] toggle failed:", e.message);
+        }
+      })();
+      break;
+    }
     case "set-theme": { settings().theme = v; save(); const sc = M.scrollTop; render(); M.scrollTop = sc; break; }
     case "toggle-set": {
       state._setOpen.has(v) ? state._setOpen.delete(v) : state._setOpen.add(v);
@@ -4356,6 +4404,36 @@ try{
 }catch(e){
   dbg("[pwa] service worker registration attempt threw:", e && e.message);
 }
+
+// v3.115: プッシュ通知（Phase 1・試験提供）。Cloudflare Worker
+// （lifecore-push）へ購読情報を送るだけの最小構成——タスクの内容などは
+// 一切送らない。PUSH_SHARED_TOKENはクライアントに埋め込むため厳密な秘密
+// にはならないが、これは「誰でも呼べるAPIへの雑な連打・スキャンを防ぐ」
+// 程度の目的で、個人利用のアプリとして許容できる範囲としている。
+const PUSH_SERVER = "https://lifecore-push.dr-ggdtm8104.workers.dev";
+const PUSH_VAPID_PUBLIC_KEY = "BJFN-ycxRb1dbd3z6gnDFF2rOaS705vyPdzuH1hWQhRYOtu1eOms2N2UuGpPkYcP7XmFsAR4tnlpBGoEANB7xL4";
+const PUSH_SHARED_TOKEN = "9MH4lFLkkoLT8iS3fyC9UKnKdmQpWlDH";
+let pushSubState = "checking";   // "checking" | "unsupported" | "off" | "on"
+
+function urlBase64ToUint8Array(base64String){
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw = atob(base64);
+  const arr = new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+async function refreshPushState(){
+  try{
+    if(!("serviceWorker" in navigator) || !("PushManager" in window)){ pushSubState = "unsupported"; return; }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    pushSubState = sub ? "on" : "off";
+  }catch(e){ pushSubState = "off"; }
+  if(state.tab==="settings") safeRender();
+}
+refreshPushState();
 
 /* keep the "now" marker and the header's current-time display fresh — tick
    every minute, regardless of which tab is open (preserving scroll position
