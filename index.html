@@ -918,7 +918,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.115";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.116";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3865,27 +3865,37 @@ document.addEventListener("click", e=>{
             const sub = await reg.pushManager.getSubscription();
             if(sub){
               try{
-                await fetch(PUSH_SERVER + "/unsubscribe", {
+                const res = await fetch(PUSH_SERVER + "/unsubscribe", {
                   method:"POST", headers:{ "Content-Type":"application/json", "X-LifeCore-Token": PUSH_SHARED_TOKEN },
                   body: JSON.stringify({ endpoint: sub.endpoint }),
                 });
-              }catch(e){}
+                dbg("[push] unsubscribe response:", res.status);
+              }catch(e){ dbg("[push] unsubscribe fetch threw:", e.message); }
               await sub.unsubscribe();
             }
             pushSubState = "off"; render(); toast("通知をオフにしました");
             return;
           }
           const perm = await Notification.requestPermission();
-          if(perm !== "granted"){ toast("通知が許可されませんでした"); return; }
+          if(perm !== "granted"){ toast("通知が許可されませんでした"); dbg("[push] permission:", perm); return; }
           const reg = await navigator.serviceWorker.ready;
           const sub = await reg.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(PUSH_VAPID_PUBLIC_KEY),
           });
-          await fetch(PUSH_SERVER + "/subscribe", {
+          // v3.116: fetch()はHTTPエラー応答（401など）では例外を投げないため、
+          // response.okを見ずに「通知をオンにしました」と出していた——サーバー側
+          // への保存が実際には失敗していても成功したように見えてしまうバグ
+          // だった。ステータスを確認し、失敗ならエラーとして扱う。
+          const res = await fetch(PUSH_SERVER + "/subscribe", {
             method:"POST", headers:{ "Content-Type":"application/json", "X-LifeCore-Token": PUSH_SHARED_TOKEN },
             body: JSON.stringify(sub.toJSON()),
           });
+          dbg("[push] subscribe response:", res.status);
+          if(!res.ok){
+            const text = await res.text().catch(()=> "");
+            throw new Error(`サーバーへの登録に失敗しました（${res.status}）${text}`);
+          }
           pushSubState = "on"; render(); toast("通知をオンにしました");
         }catch(e){
           toast("通知の設定でエラーが発生しました: " + e.message);
