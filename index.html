@@ -430,8 +430,13 @@
   }
 
   /* ---------- FAB (absolute inside the app frame) ---------- */
+  /* v3.110: bottom値が固定pxだった。.tabbarは env(safe-area-inset-bottom) の
+     ぶんだけ高さが伸びる（ホームインジケーターのある実機で顕著）が、この
+     固定値はそれを考慮していなかったため、自前ホスト後に実機（Artifactの
+     ラッパー内では起きなかった）で＋ボタンがタブバーに埋もれる不具合が
+     出た。.tabbarと同じ分だけ底上げする。 */
   .fab{
-    position:absolute;right:14px;bottom:64px;z-index:30;
+    position:absolute;right:14px;bottom:calc(64px + env(safe-area-inset-bottom,0));z-index:30;
     width:48px;height:48px;border-radius:15px;
     background:var(--primary);color:var(--on-primary);
     display:grid;place-items:center;
@@ -439,7 +444,7 @@
   }
   .fab svg{width:20px;height:20px}
   .fab-menu{
-    position:absolute;right:14px;bottom:120px;z-index:30;
+    position:absolute;right:14px;bottom:calc(120px + env(safe-area-inset-bottom,0));z-index:30;
     display:flex;flex-direction:column;gap:8px;align-items:flex-end;
   }
   .fab-menu button{
@@ -450,7 +455,7 @@
 
   /* ---------- toast ---------- */
   #toast{
-    position:absolute;left:50%;bottom:72px;transform:translateX(-50%);
+    position:absolute;left:50%;bottom:calc(72px + env(safe-area-inset-bottom,0));transform:translateX(-50%);
     background:var(--ink);color:var(--ground);
     font-size:12px;font-weight:500;padding:8px 14px;border-radius:9px;
     box-shadow:0 4px 16px rgba(22,32,29,.22);z-index:40;white-space:nowrap;
@@ -907,7 +912,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.109";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.110";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
