@@ -918,7 +918,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.112";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.113";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3155,14 +3155,22 @@ function renderSettings(){
      <div style="margin-top:8px"><button class="btn primary" data-act="copy-tasks-text">コピー</button></div>`);
 
   html += setCard("export", "バックアップ（書き出し）", ()=>
-    `<p>下のテキストをコピーして、メモやファイルに保存してください。同期が無効な状態でブラウザのデータを消すと記録は失われます。定期的な控えを推奨。</p>
+    `<p>下のテキストをコピーするか、ファイルとして保存してください。同期が無効な状態でブラウザのデータを消すと記録は失われます。定期的な控えを推奨。</p>
      <textarea class="io" id="exportBox" readonly>${esc(JSON.stringify(db))}</textarea>
-     <div style="margin-top:8px"><button class="btn primary" data-act="copy-export">コピー</button></div>`);
+     <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+       <button class="btn primary" data-act="copy-export">コピー</button>
+       <button class="btn ghost" data-act="download-export">ファイルとして保存</button>
+     </div>`);
 
   html += setCard("import", "読み込み", ()=>
-    `<p>書き出したテキストを貼り付けて反映します。</p>
+    `<p>書き出したテキストを貼り付けるか、ファイルを選んで反映します。</p>
      <p class="sheet-sub"><strong>マージ</strong>: この端末とテキスト側、それぞれにしかない項目はどちらも残ります。同じ項目を両方で編集していた場合だけテキスト側が優先されます——他の端末で編集した内容をこの端末にも反映したいとき（v3.107〜）。<br>
      <strong>完全に置き換え</strong>: この端末の内容をすべて消し、テキストの内容だけにします——壊れた・おかしいデータをまっさらに戻したいとき。</p>
+     <div style="margin-bottom:8px">
+       <label class="btn ghost" style="display:inline-flex;cursor:pointer">
+         ファイルを選択<input type="file" id="importFile" accept="application/json,.json" style="display:none">
+       </label>
+     </div>
      <textarea class="io" id="importBox" placeholder='{"version":1,...}'></textarea>
      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
        <button class="btn primary" data-act="do-import-merge">マージして読み込む</button>
@@ -4041,6 +4049,36 @@ document.addEventListener("click", e=>{
       navigator.clipboard?.writeText(box.value).then(()=>toast("コピーしました"),()=>toast("手動で選択してコピーしてください"));
       break;
     }
+    // v3.113: 自前ホストになりArtifactのサンドボックス制約（ファイル
+    // ダウンロード不可）が無くなったため、コピー&ペーストに加えてファイルへの
+    // 直接保存・直接読み込みもできるようにした——特にiCloud Driveなど
+    // PC・スマホ両方から見えるフォルダに保存すれば、テキストのやり取り自体が
+    // 不要になる。
+    case "download-export": {
+      // v3.113: Claude Artifactとして開いているときは <a download> が
+      // 効かず（ビューア側がダウンロード権限を渡さないため）静かに何も
+      // 起きなくなる。window.claude の有無で自前ホストかどうかを判定し、
+      // Artifact側では代わりにコピーへフォールバックする（無反応で
+      // ユーザーを混乱させないため）。
+      if(window.claude){
+        const box = document.getElementById("exportBox");
+        box.focus(); box.select();
+        navigator.clipboard?.writeText(box.value).then(
+          ()=>toast("この画面ではファイル保存できないため、コピーしました"),
+          ()=>toast("この画面ではファイル保存できません。手動で選択してコピーしてください"));
+        break;
+      }
+      try{
+        const blob = new Blob([JSON.stringify(db)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = `lifecore-backup-${todayStr()}.json`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url), 1000);
+        toast("ダウンロードしました");
+      }catch(e){ toast("ダウンロードできません: " + e.message); }
+      break;
+    }
     case "copy-tasks-text": {
       const box = document.getElementById("tasksTextBox");
       box.focus(); box.select();
@@ -4219,6 +4257,23 @@ document.addEventListener("input", e=>{
   if(el.id === "noteBody") n.body = el.value; else n.title = el.value;
   n.updatedAt = new Date().toISOString();
   scheduleNoteSave();
+});
+
+// v3.113: 「読み込み」の「ファイルを選択」— 選んだ .json ファイルの中身を
+// importBox にそのまま流し込むだけ。マージ／完全に置き換えの2つのボタンは
+// 既存のまま（importBox.value を見るだけなので、貼り付けでもファイル選択
+// でもここから先の処理は共通）。
+document.addEventListener("change", e=>{
+  const el = e.target;
+  if(!el || el.id !== "importFile") return;
+  const file = el.files && el.files[0];
+  if(!file) return;
+  file.text().then(txt=>{
+    const box = document.getElementById("importBox");
+    if(box) box.value = txt;
+    toast("ファイルを読み込みました（内容を確認してマージ/置き換えを押してください）");
+  }).catch(err=>toast("ファイルを読み込めません: " + err.message));
+  el.value = "";
 });
 
 const TOAST = document.getElementById("toast");
