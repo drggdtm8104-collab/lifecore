@@ -2,7 +2,7 @@
 //
 // 更新のたびに CACHE_VERSION を変える（例: "v3.108" のようにAPP_VERSIONと合わせる）。
 // 変えないと、古いキャッシュがいつまでも使われ続けて新しい版が反映されない。
-const CACHE_VERSION = "v3.117";
+const CACHE_VERSION = "v3.118";
 const CACHE_NAME = "lifecore-" + CACHE_VERSION;
 
 // 同一オリジンの、アプリを開くために最低限必要なファイルだけを事前キャッシュする。
@@ -64,7 +64,8 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-// ---------- プッシュ通知（Phase 1: 固定文言のみ、タスクの内容は扱わない） ----------
+// ---------- プッシュ通知（Phase 4: 時間指定タスクの時刻ごとに個別送信。
+//            本文の組み立てはサーバー側（push-server/worker.js）が行う） ----------
 self.addEventListener("push", (event) => {
   let data = { title: "LifeCore", body: "" };
   try { if (event.data) data = event.data.json(); } catch (e) {}
