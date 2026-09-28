@@ -907,7 +907,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.108";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.109";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1999,11 +1999,17 @@ function applyTemplate(d, tplId){
   const prevTaskIds = prevTpl ? new Set((prevTpl.tasks||[]).map(r=>r.taskId)) : new Set();
   const rows = tpl.tasks || [];
 
-  const pool = {};
+  // v3.109: 完了ずみ（status:"done"）の実施を再利用対象から除外していたため、
+  // 同じ日にテンプレートを再適用する（テンプレ編集の保存で「今日の予定に反映」
+  // したときなど）たびに、すでに完了した枠のぶんだけ新しい実施が重複して
+  // 作られてしまっていた——実際にユーザーのデータで同じ枠が3〜4件に増える
+  // 事故が起きた。完了ずみも再利用対象に含め、時刻だけ更新する（完了状態・
+  // 実績は変更しない）ようにして、再適用が重複を生まないようにする。
+  const pool = {}, donePool = {};
   db.occurrences.forEach(o=>{
-    if(o.date===d && o.status==="planned" && (o.fromTpl || prevTaskIds.has(o.taskId))){
-      (pool[o.taskId] = pool[o.taskId] || []).push(o);
-    }
+    if(o.date!==d || !(o.fromTpl || prevTaskIds.has(o.taskId))) return;
+    if(o.status==="planned") (pool[o.taskId] = pool[o.taskId] || []).push(o);
+    else if(o.status==="done") (donePool[o.taskId] = donePool[o.taskId] || []).push(o);
   });
   const claimed = new Set();
   rows.forEach(row=>{
@@ -2016,6 +2022,14 @@ function applyTemplate(d, tplId){
       ex.plannedStart = row.time || null;
       ex.plannedMin = row.mins || ex.plannedMin || null;
       ex.fromTpl = true;   // adopt it into template tracking, whether it already was or not
+      return;
+    }
+    // すでに完了ずみの実施があれば、それを「この枠は既にある」ものとして扱い
+    // 新規作成を避ける——完了の記録（実績・完了時刻）はそのまま触らない。
+    const doneAvail = (donePool[row.taskId] || []).filter(o=>!claimed.has(o.id));
+    if(doneAvail.length){
+      claimed.add(doneAvail[0].id);
+      doneAvail[0].fromTpl = true;
       return;
     }
     // v3.101: テンプレート適用で完了型タスクの新しい実施ができるときも、
@@ -2036,16 +2050,35 @@ function applyTemplate(d, tplId){
     return !(o.fromTpl || prevTaskIds.has(o.taskId));
   });
 
-  // 予定（tpl.plans）: この日の fromTpl 付き予定を作り直す。テンプレの「今の中身」を
-  // コピーして一から追加したのと同じ状態にする（個別に追加した予定は触らない）。
-  db.occurrences = db.occurrences.filter(o=>!(o.date===d && o.plan && o.fromTpl));
-  (tpl.plans||[]).forEach(b=>{
-    db.occurrences.push({
-      id:uid(), taskId:null, date:d, title:b.label||"", plan:true,
-      plannedStart:b.time||null, plannedMin:b.mins||null, category:b.category||"その他",
-      actualMin:null, status:"plan", doneAt:null, adhoc:false, note:"", fromTpl:true,
-    });
+  // 予定（tpl.plans）: テンプレの「今の中身」に合わせて更新する。
+  // v3.109: 以前はこの日のfromTpl付き予定を全部消してから作り直していたが、
+  // そのたびに新しいidが振られるため、複数端末でそれぞれ独自に適用した結果を
+  // クラウド同期（id単位のマージ）で合流させると、同じ「起床」「仕事」などが
+  // 際限なく重複してしまっていた（実際にユーザーのデータで確認）。ラベルで
+  // 対応する既存の予定を探して再利用し（idを変えない）、見つからないときだけ
+  // 新規作成する。
+  const planPool = {};
+  db.occurrences.forEach(o=>{
+    if(o.date===d && o.plan && o.fromTpl) (planPool[o.title||""] = planPool[o.title||""] || []).push(o);
   });
+  const planClaimed = new Set();
+  (tpl.plans||[]).forEach(b=>{
+    const label = b.label || "";
+    const avail = (planPool[label] || []).filter(o=>!planClaimed.has(o.id));
+    if(avail.length){
+      const ex = avail[0];
+      planClaimed.add(ex.id);
+      ex.plannedStart = b.time||null; ex.plannedMin = b.mins||null; ex.category = b.category||"その他";
+      return;
+    }
+    const created = { id:uid(), taskId:null, date:d, title:label, plan:true,
+      plannedStart:b.time||null, plannedMin:b.mins||null, category:b.category||"その他",
+      actualMin:null, status:"plan", doneAt:null, adhoc:false, note:"", fromTpl:true };
+    db.occurrences.push(created);
+    planClaimed.add(created.id);
+  });
+  // 前回はあったが今回のテンプレの中身には無くなった予定（ブロック削除・改名）だけを消す
+  db.occurrences = db.occurrences.filter(o=>!(o.date===d && o.plan && o.fromTpl) || planClaimed.has(o.id));
 
   // tplPlansCopied: この日は予定のコピーずみ、という印。migrate() の一度きりの
   // 補完（後述）が、ユーザーが後でコピーぶんを削除した日を復活させないための目印。
