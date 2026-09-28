@@ -918,7 +918,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.116";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.117";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1202,6 +1202,7 @@ function save(){
     flushPush();       // push each edit right away — an iOS kill can wipe localStorage
     schedulePush();    // + a short backstop in case that push was coalesced away
   }
+  schedulePushDigestSync();   // v3.117: 通知オン時だけ、今日のタスク名をサーバーへ同期する
 }
 
 /* ---- shape <-> month-sharded docs ---- */
@@ -3127,14 +3128,15 @@ function renderSettings(){
     `<p>「今日」画面の上部に、その日の予定量が普段こなせる量に収まっているか・崩れやすい時間帯かを表示します。傾向タブの学習結果を使います。</p>
      <button class="btn ${settings().showOutlook!==false?"primary":""}" data-act="toggle-outlook">${settings().showOutlook!==false?"表示中（タップでオフ）":"非表示（タップでオン）"}</button>`);
 
-  // v3.115: プッシュ通知（Phase 1・試験提供）。今はまだ「毎朝8時ごろに固定の
-  // 文言で1通」だけ——タスクの内容などは外部（通知サーバー）に一切送らない。
+  // v3.115〜v3.117: プッシュ通知（試験提供）。毎朝8時ごろ、その日まだ
+  // 終わっていないタスク名を並べた通知を送る。オンにしている間だけ、
+  // タスク名（内容・メモなどは含まない）を通知サーバーに一時的に同期する。
   html += setCard("push", "通知（試験提供）", ()=>{
     if(!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window) || !window.isSecureContext){
       return `<p>この環境では通知に対応していません（ホーム画面に追加したアプリとして開く必要があります）。</p>`;
     }
     const label = pushSubState==="on" ? "通知をオフにする" : pushSubState==="checking" ? "確認中…" : "通知を受け取る";
-    return `<p>毎朝8時ごろ、固定の文言（「今日のスケジュールを確認しましょう」）で通知します。タスクの内容などは送信・保存されません（Phase 1）。</p>
+    return `<p>毎朝8時ごろ、その日まだ終わっていないタスクの名前を並べた通知を送ります。オンにしている間だけ、タスク名（備考やメモなどの内容は含みません）を通知サーバーに一時的に同期します。オフにすれば同期は止まります。</p>
      <button class="btn ${pushSubState==="on"?"primary":""}" data-act="toggle-push" ${pushSubState==="checking"?"disabled":""}>${label}</button>`;
   });
 
@@ -3897,6 +3899,7 @@ document.addEventListener("click", e=>{
             throw new Error(`サーバーへの登録に失敗しました（${res.status}）${text}`);
           }
           pushSubState = "on"; render(); toast("通知をオンにしました");
+          schedulePushDigestSync();   // 初回は次のsave()を待たず、すぐ今日のタスク名を同期する
         }catch(e){
           toast("通知の設定でエラーが発生しました: " + e.message);
           dbg("[push] toggle failed:", e.message);
@@ -4415,11 +4418,14 @@ try{
   dbg("[pwa] service worker registration attempt threw:", e && e.message);
 }
 
-// v3.115: プッシュ通知（Phase 1・試験提供）。Cloudflare Worker
-// （lifecore-push）へ購読情報を送るだけの最小構成——タスクの内容などは
-// 一切送らない。PUSH_SHARED_TOKENはクライアントに埋め込むため厳密な秘密
-// にはならないが、これは「誰でも呼べるAPIへの雑な連打・スキャンを防ぐ」
+// v3.115: プッシュ通知。Cloudflare Worker（lifecore-push）へ購読情報を
+// 送る。PUSH_SHARED_TOKENはクライアントに埋め込むため厳密な秘密には
+// ならないが、これは「誰でも呼べるAPIへの雑な連打・スキャンを防ぐ」
 // 程度の目的で、個人利用のアプリとして許容できる範囲としている。
+// v3.117（Phase 3）: 通知をオンにしている場合に限り、今日のタスク名
+// だけをサーバーへ同期し、毎朝の通知本文に反映できるようにした
+// （件数だけ・見通しの判定結果だけ、ではなく実際のタスク名を出す方を
+// 選んだ——ユーザーの指示）。通知をオフのままなら何も送らない。
 const PUSH_SERVER = "https://lifecore-push.dr-ggdtm8104.workers.dev";
 const PUSH_VAPID_PUBLIC_KEY = "BJFN-ycxRb1dbd3z6gnDFF2rOaS705vyPdzuH1hWQhRYOtu1eOms2N2UuGpPkYcP7XmFsAR4tnlpBGoEANB7xL4";
 const PUSH_SHARED_TOKEN = "9MH4lFLkkoLT8iS3fyC9UKnKdmQpWlDH";
@@ -4442,8 +4448,34 @@ async function refreshPushState(){
     pushSubState = sub ? "on" : "off";
   }catch(e){ pushSubState = "off"; }
   if(state.tab==="settings") safeRender();
+  if(pushSubState==="on") schedulePushDigestSync();
 }
 refreshPushState();
+
+// v3.117: 今日のまだ終わっていない実施（タスク・食事などの継続型含む、
+// 予定=plan:trueは通知の対象外）の名前だけを集める。重複は1つにまとめる
+// （「水」のように1日に何度も出る継続型タスクがあるため）。
+function todaysTaskNames(){
+  const t = todayStr();
+  const names = db.occurrences
+    .filter(o => o.date===t && !o.plan && o.status!=="done")
+    .map(o => occName(o))
+    .filter(Boolean);
+  return [...new Set(names)];
+}
+
+let pushDigestTimer = null;
+function schedulePushDigestSync(){
+  if(pushSubState !== "on") return;
+  clearTimeout(pushDigestTimer);
+  pushDigestTimer = setTimeout(()=>{
+    const names = todaysTaskNames();
+    fetch(PUSH_SERVER + "/today-digest", {
+      method:"POST", headers:{ "Content-Type":"application/json", "X-LifeCore-Token": PUSH_SHARED_TOKEN },
+      body: JSON.stringify({ date: todayStr(), names }),
+    }).then(res=>dbg("[push] digest sync:", res.status)).catch(e=>dbg("[push] digest sync failed:", e.message));
+  }, 3000);
+}
 
 /* keep the "now" marker and the header's current-time display fresh — tick
    every minute, regardless of which tab is open (preserving scroll position
