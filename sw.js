@@ -2,7 +2,7 @@
 //
 // 更新のたびに CACHE_VERSION を変える（例: "v3.108" のようにAPP_VERSIONと合わせる）。
 // 変えないと、古いキャッシュがいつまでも使われ続けて新しい版が反映されない。
-const CACHE_VERSION = "v3.110";
+const CACHE_VERSION = "v3.111";
 const CACHE_NAME = "lifecore-" + CACHE_VERSION;
 
 // 同一オリジンの、アプリを開くために最低限必要なファイルだけを事前キャッシュする。
@@ -44,7 +44,7 @@ self.addEventListener("fetch", (event) => {
   // 取得できたときだけキャッシュを更新する（ネット優先・オフライン時のみキャッシュ）。
   if (req.mode === "navigate") {
     event.respondWith(
-      fetch(req)
+      fetch(req, { cache: "no-store" })
         .then((res) => {
           const copy = res.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", copy)).catch(() => {});
