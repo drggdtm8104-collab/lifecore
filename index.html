@@ -447,6 +447,12 @@
     position:absolute;right:14px;bottom:calc(120px + env(safe-area-inset-bottom,0));z-index:30;
     display:flex;flex-direction:column;gap:8px;align-items:flex-end;
   }
+  /* v3.112: .fab/.fab-menu が自前で display:grid/flex を指定していたため、
+     HTMLの hidden 属性（ブラウザ標準では [hidden]{display:none}）がこの
+     クラスの指定に負けて効かなくなっていた——closeFab()でFABM.hidden=true
+     にしても見た目には何も起きず、メニューが画面に残り続ける不具合の原因。
+     hidden指定時だけ確実にdisplay:noneで上書きする。 */
+  .fab[hidden], .fab-menu[hidden]{ display:none; }
   .fab-menu button{
     background:var(--surface);border:1px solid var(--hairline);
     border-radius:10px;padding:9px 12px;font-size:12.5px;font-weight:500;
@@ -912,7 +918,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.111";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.112";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
