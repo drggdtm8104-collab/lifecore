@@ -918,7 +918,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.113";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.114";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -4071,8 +4071,14 @@ document.addEventListener("click", e=>{
       try{
         const blob = new Blob([JSON.stringify(db)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
+        // v3.114: 日付だけだと同じ日に複数回保存したときにファイル名が
+        // 衝突する（上書きされる／末尾に(1)などが付いて分かりにくくなる）
+        // ため、分単位の時刻まで含める。スケジュール上の「4時で日付が
+        // 切り替わる」概念（todayStr()）ではなく、実際の今の時刻を使う。
+        const now = new Date();
+        const stamp = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
         const a = document.createElement("a");
-        a.href = url; a.download = `lifecore-backup-${todayStr()}.json`;
+        a.href = url; a.download = `lifecore-backup-${stamp}.json`;
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(()=>URL.revokeObjectURL(url), 1000);
         toast("ダウンロードしました");
