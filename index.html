@@ -918,7 +918,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.120";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.121";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3155,7 +3155,10 @@ function renderSettings(){
       local:  "この端末内のみ（オフライン、または claude.ai 外で表示中）",
       "step1-exists": "接続テスト中: DB 読み取り OK（既存データあり）※まだ書き込みません",
       "step1-empty":  "接続テスト中: DB 読み取り OK（DB は空）※まだ書き込みません",
-      "step2-written": "接続テスト中: この端末のデータを DB へ書き込み完了 ※採用・監視はまだ",
+      // v3.121: "step2-written" は syncMode に一度も代入されない、完全に
+      // 到達不能な表示エントリだったため削除した（SYNC_STEP/syncModeの
+      // 他の部分——段階的ロールアウト用の意図的なフラグ機構——は、
+      // 挙動に影響する実質的な判断が絡むため今回は触れていない）。
     }[syncMode] || `この端末内のみ（${esc(syncMode)}）`;
     const syncedAt = db.meta && db.meta.syncedAt ? new Date(db.meta.syncedAt).toLocaleString() : "—";
     const hasPremerge = (()=>{ try{ return !!localStorage.getItem(KEY + ".premerge"); }catch(e){ return false; } })();
