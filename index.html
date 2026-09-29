@@ -918,7 +918,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.119";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.120";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3133,10 +3133,11 @@ function renderSettings(){
     `<p>「今日」画面の上部に、その日の予定量が普段こなせる量に収まっているか・崩れやすい時間帯かを表示します。傾向タブの学習結果を使います。</p>
      <button class="btn ${settings().showOutlook!==false?"primary":""}" data-act="toggle-outlook">${settings().showOutlook!==false?"表示中（タップでオフ）":"非表示（タップでオン）"}</button>`);
 
-  // v3.115〜v3.117: プッシュ通知（試験提供）。毎朝8時ごろ、その日まだ
-  // 終わっていないタスク名を並べた通知を送る。オンにしている間だけ、
-  // タスク名（内容・メモなどは含まない）を通知サーバーに一時的に同期する。
-  html += setCard("push", "通知（試験提供）", ()=>{
+  // v3.118: プッシュ通知。時間が決まっているタスクについて、その時刻に
+  // なったらタスクごとに個別に通知を送る。オンにしている間だけ、対象
+  // タスクの名前・時刻（内容・メモなどは含まない）を通知サーバーに
+  // 一時的に同期する。
+  html += setCard("push", "通知", ()=>{
     if(!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window) || !window.isSecureContext){
       return `<p>この環境では通知に対応していません（ホーム画面に追加したアプリとして開く必要があります）。</p>`;
     }
