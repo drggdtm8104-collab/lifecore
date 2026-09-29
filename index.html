@@ -918,7 +918,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.121";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.122";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -991,6 +991,13 @@ const tplNameShort = name => (name && name.length >= 5) ? name.slice(0,4) + "...
 /* schedule day = 00:00 → 28:00; 00:00–03:59 counts as "last night" → 24:00–27:59 */
 const timeKey = t => { if(!t) return 1e9; let [h,m]=t.split(":").map(Number); if(h<NIGHT_END_HOUR) h+=24; return h*60+m; };
 const keyToLabel = key => `${pad(Math.floor(key/60))}:${pad(key%60)}`;   // 00:00 .. 28:00 (25時表記)
+/* v3.122: 「ひと段落」機能用。keyToLabel()は24時超え表記の"表示専用"で実在
+   しない時刻（26:00等）になりうるため、plannedStartへ保存する実時刻には
+   使えない——durFromEnd()等と同じ%1440の折り返しで実時刻に変換する専用の
+   ヘルパーを分ける。 */
+const keyToTime = key => { const t = ((key % 1440) + 1440) % 1440; return `${pad(Math.floor(t/60))}:${pad(t%60)}`; };
+const HD_BEDTIME_KEY = 25*60;   // 「ひと段落」提案の終端＝就寝固定25:00（設定化はv1では見送り）
+const HD_DEFAULT_MIN = 30;      // estMin未設定のスキル系タスクに使うフォールバック所要時間
 const fmtDur = min => min < 60 ? `${min}分` : `${Math.floor(min/60)}時間${min%60 ? (min%60)+"分" : ""}`;
 /* start "HH:MM" + minutes -> end "HH:MM" (24h, wraps past midnight) */
 const endFromDur = (start, min) => { const t = (timeKey(start) + min) % 1440; return `${pad(Math.floor(t/60))}:${pad(t%60)}`; };
@@ -1680,6 +1687,34 @@ const occName = o => o.taskId ? (taskOf(o)?.name ?? "(削除済み)") : (o.title
 const occCat  = o => o.category || taskOf(o)?.category || "";
 const occMin  = o => o.actualMin ?? o.plannedMin ?? taskOf(o)?.estMin ?? 0;
 const occsOn  = d => db.occurrences.filter(o=>o.date===d);
+/* v3.122: 「ひと段落」機能用。[fromKey,untilKey) の間で、その日すでに時間が
+   決まっている実施（plannedStart+plannedMinが両方ある——予定=plan:trueの
+   帯だけでなく、夕食のような継続型タスクのoccurrenceも対象。食事はplan行
+   ではなく継続型タスクとして保存されるため、plan有無では絞れない）を占有
+   区間とみなし、それ以外の空きギャップを時系列順に返す。先送り
+   （status:"deferred"）はその日の枠を手放しているとみなし占有扱いしない。 */
+function freeGapsFrom(date, fromKey, untilKey){
+  if(fromKey >= untilKey) return [];
+  const busy = occsOn(date)
+    .filter(o => o.plannedStart && o.plannedMin && o.status!=="deferred" && o.status!=="skipped")
+    .map(o => { const s = timeKey(o.plannedStart); return [s, s + o.plannedMin]; })
+    .map(([s,e]) => [Math.max(s, fromKey), Math.min(e, untilKey)])
+    .filter(([s,e]) => e > s)
+    .sort((a,b) => a[0]-b[0]);
+
+  const merged = [];
+  busy.forEach(([s,e]) => {
+    const last = merged[merged.length-1];
+    if(last && s <= last[1]) last[1] = Math.max(last[1], e);
+    else merged.push([s,e]);
+  });
+
+  const gaps = [];
+  let cur = fromKey;
+  merged.forEach(([s,e]) => { if(s > cur) gaps.push({start:cur, end:s}); cur = Math.max(cur, e); });
+  if(cur < untilKey) gaps.push({start:cur, end:untilKey});
+  return gaps;
+}
 // v3.100: タスク一覧（タスクタブ・タスクの編集シート）から進捗メモを見るとき、
 // 「今日の実施」に絞らず一番新しい実施を見る——今日まだ置いていない残タスク
 // でも、前回どこまでやったかをタスク一覧側から常に確認できるようにするため
@@ -1843,6 +1878,22 @@ function weekCount(taskId, ref){
   return db.occurrences.filter(o=>o.taskId===taskId && o.status==="done" && inRange(o.date,ws,we)).length;
 }
 function hasOccToday(taskId, d){ return db.occurrences.some(o=>o.taskId===taskId && o.date===d); }
+/* v3.122: 「ひと段落」機能用。継続型タスクが頻度目標に対してどれだけ
+   後回しになっているかを0〜7のレンジで返す（大きいほど優先）。傾向タブの
+   analyze()にはこれに使える既存ロジックが無い（chronicは完了型寄り、
+   repeatDayは曜日パターンで緊急度ではない）ため新規に最小限で作る。 */
+function skillBacklog(t, date){
+  if(t.freq?.type === "perWeek"){
+    const n = t.freq.n || 1;
+    return Math.max(0, n - weekCount(t.id, date));
+  }
+  let doneDays = 0;
+  for(let i=1; i<=7; i++){
+    const d = addDays(date, -i);
+    if(db.occurrences.some(o=>o.taskId===t.id && o.date===d && o.status==="done")) doneDays++;
+  }
+  return 7 - doneDays;
+}
 
 /* ============================================================
    ANALYSIS — learn the user's tendencies from past operations only
@@ -3464,6 +3515,81 @@ function sheetRemark(id){
     </div>`);
 }
 
+/* v3.122: 「ひと段落」機能。fromKey（数値の分キー、timeKey()と同じ表記）〜
+   就寝(HD_BEDTIME_KEY)までの空き時間に、後回し度が高いスキル系継続型
+   タスクから順に、目安時間（estMin、無ければHD_DEFAULT_MIN）ぶんだけ
+   時系列で最初に入る空きギャップへ貪欲に詰める。入らない候補はスキップ
+   する（提案しないだけで、削除や先送り扱いにはしない）。
+   v2拡張ポイント: 余裕時間の傾斜配分やタスクごとの上限時間を足すなら、
+   下の `const min = ...` の行と、割り当て後の余り処理をここに追加する。
+   純粋関数（db.tasks/db.occurrencesを読むだけで書き込まない）。 */
+function planHitodanraku(date, fromKey){
+  if(fromKey >= HD_BEDTIME_KEY) return { gaps: [], plan: [] };
+  const gaps = freeGapsFrom(date, fromKey, HD_BEDTIME_KEY).map(g => ({...g}));
+
+  // 今日すでに未完了(planned)の実施が残っているタスクだけ除外する——
+  // 今日done済みでも、継続型タスクは1日に複数回置ける既存の設計思想
+  // （sheetTodayPick()と同じ考え方）に合わせ、再提案の対象にする。
+  const pendingToday = t => db.occurrences.some(o => o.taskId===t.id && o.date===date && o.status==="planned");
+  const candidates = db.tasks
+    .filter(t => t.kind==="repeat" && (t.rtype||"routine")==="skill" && !pendingToday(t))
+    .map(t => ({ task:t, backlog: skillBacklog(t, date) }))
+    .sort((a,b) => b.backlog - a.backlog || (a.task.createdAt||"").localeCompare(b.task.createdAt||""));
+
+  const plan = [];
+  candidates.forEach(({task}) => {
+    const min = task.estMin || HD_DEFAULT_MIN;
+    const gap = gaps.find(g => (g.end - g.start) >= min);
+    if(!gap) return;
+    plan.push({ task, start: keyToTime(gap.start), min });
+    gap.start += min;
+  });
+  return { gaps, plan };
+}
+
+function sheetHitodanraku(){
+  openSheet(`<h2>ひと段落</h2>
+    <p class="sheet-sub">この時刻を起点に、就寝（25:00）までの空き時間にスキル系タスクを提案します。</p>
+    <label class="fld"><span>時刻</span><input type="time" id="hdTime" value="${esc(fmtNowTime())}"></label>
+    <p class="sheet-sub" style="margin-top:2px">先の終わる時刻が早めに分かっていれば、その時刻に変えておけます。</p>
+    <div class="sheet-actions">
+      <button class="btn ghost" data-act="close-sheet">キャンセル</button>
+      <button class="btn primary" data-act="hd-generate">提案を見る</button>
+    </div>`);
+}
+
+function sheetHitodanrakuPreview(fromTime){
+  const { gaps, plan } = planHitodanraku(state.date, timeKey(fromTime));
+  if(!gaps.length || !gaps.some(g=>g.end>g.start)){
+    openSheet(`<h2>ひと段落</h2>
+      <p class="sheet-sub">${esc(fromTime)}〜25:00の間に空き時間がありませんでした。</p>
+      <div class="sheet-actions"><button class="btn primary" data-act="close-sheet">閉じる</button></div>`);
+    return;
+  }
+  if(!plan.length){
+    openSheet(`<h2>ひと段落</h2>
+      <p class="sheet-sub">提案できるスキル系タスクがありませんでした（対象タスクが無い、または今日ぶんが残っていません）。</p>
+      <div class="sheet-actions"><button class="btn primary" data-act="close-sheet">閉じる</button></div>`);
+    return;
+  }
+  openSheet(`<h2>ひと段落 — 提案</h2>
+    <p class="sheet-sub">${esc(fromTime)}〜25:00の空き時間に、後回し度の高い順で詰めました。チェックを外せば除外できます。</p>
+    <div class="tasklist" id="hdList">
+      ${plan.map(p => `
+        <label class="cand hd-cand" data-taskid="${p.task.id}" data-start="${p.start}" data-min="${p.min}">
+          <input type="checkbox" data-f="sel" checked>
+          <div style="flex:1">
+            <div class="cd-name">${esc(p.task.name)}</div>
+            <div class="cd-meta">${esc(p.start)}〜${esc(endFromDur(p.start, p.min))}・${fmtDur(p.min)}</div>
+          </div>
+        </label>`).join("")}
+    </div>
+    <div class="sheet-actions">
+      <button class="btn ghost" data-act="close-sheet">キャンセル</button>
+      <button class="btn primary" data-act="hd-confirm">確定</button>
+    </div>`);
+}
+
 function sheetMarker(id){
   const m = id ? db.occurrences.find(x=>x.id===id && x.plan) : null;
   const curEnd = (m && m.plannedStart && m.plannedMin) ? endFromDur(m.plannedStart, m.plannedMin) : "";
@@ -3692,6 +3818,28 @@ document.addEventListener("click", e=>{
     case "fab-toggle": FABM.hidden ? openFab() : closeFab(); break;
     case "open-today-pick": closeFab(); sheetTodayPick(); break;
     case "open-marker": closeFab(); sheetMarker(null); break;
+    case "open-hitodanraku": closeFab(); sheetHitodanraku(); break;
+    case "hd-generate": {
+      const time = document.getElementById("hdTime")?.value || fmtNowTime();
+      db.dayMeta[state.date] = Object.assign({}, db.dayMeta[state.date], { hitodanrakuAt: time });
+      save();
+      sheetHitodanrakuPreview(time);
+      break;
+    }
+    case "hd-confirm": {
+      const rows = [...document.querySelectorAll("#hdList .hd-cand")]
+        .filter(r => r.querySelector('[data-f="sel"]').checked);
+      rows.forEach(r => {
+        const t = db.tasks.find(x=>x.id===r.dataset.taskid); if(!t) return;
+        db.occurrences.push({ id:uid(), taskId:t.id, date:state.date,
+          plannedStart:r.dataset.start, plannedMin:+r.dataset.min,
+          actualMin:null, status:"planned",
+          doneAt:null, adhoc:false, meal:false, title:null, note:"" });
+      });
+      save(); closeSheet(); render();
+      toast(rows.length ? `${rows.length}件追加しました` : "追加しませんでした");
+      break;
+    }
     case "edit-marker": sheetMarker(id); break;
     case "mk-clear-span": {
       const e = document.getElementById("mkEnd"), mn = document.getElementById("mkMin");
@@ -4365,7 +4513,8 @@ function toast(msg){
 function openFab(){
   FABM.innerHTML = `
     <button data-act="open-today-pick">ToDoリストに追加</button>
-    <button data-act="open-marker">予定を追加</button>`;
+    <button data-act="open-marker">予定を追加</button>
+    <button data-act="open-hitodanraku">ひと段落</button>`;
   FABM.hidden = false;
   FAB.querySelector("svg").style.transform = "rotate(45deg)";
 }
