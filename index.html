@@ -918,7 +918,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.123";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.124";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2133,6 +2133,9 @@ function applyTemplate(d, tplId){
     if(o.date===d && o.plan && o.fromTpl) (planPool[o.title||""] = planPool[o.title||""] || []).push(o);
   });
   const planClaimed = new Set();
+  // v3.123: freeBlockはテンプレの予定行自体が持つ（sheetMarkerでの日ごとの
+  // 手直しだけだと、テンプレを再適用するたびに元の状態に戻ってしまうため）。
+  // 再利用・新規作成のどちらでも、その日の実施へ毎回コピーし直す。
   (tpl.plans||[]).forEach(b=>{
     const label = b.label || "";
     const avail = (planPool[label] || []).filter(o=>!planClaimed.has(o.id));
@@ -2140,11 +2143,12 @@ function applyTemplate(d, tplId){
       const ex = avail[0];
       planClaimed.add(ex.id);
       ex.plannedStart = b.time||null; ex.plannedMin = b.mins||null; ex.category = b.category||"その他";
+      ex.freeBlock = !!b.freeBlock;
       return;
     }
     const created = { id:uid(), taskId:null, date:d, title:label, plan:true,
       plannedStart:b.time||null, plannedMin:b.mins||null, category:b.category||"その他",
-      actualMin:null, status:"plan", doneAt:null, adhoc:false, note:"", fromTpl:true };
+      actualMin:null, status:"plan", doneAt:null, adhoc:false, note:"", fromTpl:true, freeBlock: !!b.freeBlock };
     db.occurrences.push(created);
     planClaimed.add(created.id);
   });
@@ -3122,6 +3126,7 @@ function renderTemplates(){
           <input type="time" data-f="end" value="${endV}">
           <input type="number" data-f="mins" value="${b.mins ?? ""}" min="1" placeholder="分">
           ${b.mins ? `<button type="button" class="mini-clear" data-act="tpl-clear-span" data-i="${i}">クリア</button>` : ""}
+          <label>自由時間 <input type="checkbox" data-f="free" ${b.freeBlock?"checked":""}></label>
         </div>
       </div>`;
     });
@@ -4454,7 +4459,8 @@ function readTplEditor(){
     const rawMins = (line.querySelector('[data-f="mins"]').value || "").trim();
     let mins = end ? durFromEnd(time, end) : (rawMins === "" ? null : (parseInt(rawMins,10) || null));
     if(mins === 0) mins = null;
-    return { time, label: line.querySelector('[data-f="label"]').value.trim(), mins, category:"" };
+    const free = !!line.querySelector('[data-f="free"]')?.checked;
+    return { time, label: line.querySelector('[data-f="label"]').value.trim(), mins, category:"", freeBlock: free };
   });
   // task placements
   const taskLines = [...document.querySelectorAll("#tplTasks .tpl-task-line")];
