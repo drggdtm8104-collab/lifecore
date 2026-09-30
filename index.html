@@ -918,7 +918,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.122";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.123";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1696,7 +1696,10 @@ const occsOn  = d => db.occurrences.filter(o=>o.date===d);
 function freeGapsFrom(date, fromKey, untilKey){
   if(fromKey >= untilKey) return [];
   const busy = occsOn(date)
-    .filter(o => o.plannedStart && o.plannedMin && o.status!=="deferred" && o.status!=="skipped")
+    // freeBlock=true の予定（例: テンプレの「自由時間」）はタイムライン上は
+    // そのまま表示されるが、ひと段落の占有判定からは除外する——空いている
+    // ことを明示するためだけの予定枠なので、隙間として使えるようにする。
+    .filter(o => o.plannedStart && o.plannedMin && o.status!=="deferred" && o.status!=="skipped" && !o.freeBlock)
     .map(o => { const s = timeKey(o.plannedStart); return [s, s + o.plannedMin]; })
     .map(([s,e]) => [Math.max(s, fromKey), Math.min(e, untilKey)])
     .filter(([s,e]) => e > s)
@@ -3610,6 +3613,10 @@ function sheetMarker(id){
     <div class="radio-row" id="mkCat">
       ${CATS.map(c=>`<button data-v="${c}" class="${curCat===c?"on":""}">${c}</button>`).join("")}
     </div>
+    <label class="fld" style="display:flex;align-items:center;gap:8px;margin-top:14px">
+      <input type="checkbox" id="mkFree" ${m?.freeBlock?"checked":""} style="width:18px;height:18px;flex:none">
+      <span>自由時間として扱う（タイムラインには残るが、「ひと段落」の提案ではこの時間帯も空き扱いにする）</span>
+    </label>
     <label class="fld"><span>備考（任意）</span><textarea id="mkNote" class="fld-note" placeholder="補足など">${esc(m?.note||"")}</textarea></label>
     <div class="sheet-actions">
       ${m ? `<button class="btn ghost" style="flex:0;color:var(--over)" data-act="del-marker" data-id="${m.id}">削除</button>` : ""}
@@ -3857,13 +3864,14 @@ document.addEventListener("click", e=>{
       if(mins === 0) mins = null;
       const cat = document.querySelector("#mkCat button.on")?.dataset.v || "その他";
       const note = (document.getElementById("mkNote")?.value || "").trim();
+      const freeBlock = !!document.getElementById("mkFree")?.checked;
       if(id){
         const m = db.occurrences.find(x=>x.id===id && x.plan); if(!m) break;
-        m.title = name; m.plannedStart = st; m.plannedMin = mins; m.category = cat; m.note = note;
+        m.title = name; m.plannedStart = st; m.plannedMin = mins; m.category = cat; m.note = note; m.freeBlock = freeBlock;
       } else {
         db.occurrences.push({ id:uid(), taskId:null, date:state.date, title:name, plan:true,
           plannedStart:st, plannedMin: mins, category: cat, actualMin:null, status:"plan",
-          doneAt:null, adhoc:false, note });
+          doneAt:null, adhoc:false, note, freeBlock });
       }
       save(); closeSheet(); render(); break;
     }

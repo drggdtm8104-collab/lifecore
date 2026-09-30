@@ -150,5 +150,34 @@ hdCandRows = [
 dispatchClick("hd-confirm");
 ok("unchecking a candidate excludes it from confirmation", T.db.occurrences.length===0);
 
+// ============================================================
+// v3.123: 予定（sheetMarker）に「自由時間として扱う」チェックボックスを追加
+// ============================================================
+T.db.occurrences = [];
+
+// -------- 新規作成: チェックボックスが表示され、デフォルトは未チェック --------
+sandbox.sheetMarker(null);
+ok("sheetMarker(null) shows the freeBlock checkbox, unchecked by default", sheetEl.innerHTML.includes('id="mkFree"') && !sheetEl.innerHTML.includes('id="mkFree" checked'));
+
+// -------- 新規作成でチェックを入れて保存すると freeBlock:true が保存される --------
+elStore.mkName = mkEl("mkName"); elStore.mkName.value = "自由時間";
+elStore.mkStart = mkEl("mkStart"); elStore.mkStart.value = "18:00";
+elStore.mkEnd = mkEl("mkEnd"); elStore.mkEnd.value = "";
+elStore.mkMin = mkEl("mkMin"); elStore.mkMin.value = "120";
+elStore.mkNote = mkEl("mkNote"); elStore.mkNote.value = "";
+elStore.mkFree = mkEl("mkFree"); elStore.mkFree.checked = true;
+dispatchClick("save-marker");
+ok("saving a new marker with the checkbox checked stores freeBlock:true", T.db.occurrences.length===1 && T.db.occurrences[0].freeBlock===true);
+
+// -------- 編集時: 既存が freeBlock:true ならチェック済みで表示される --------
+const markerId = T.db.occurrences[0].id;
+sandbox.sheetMarker(markerId);
+ok("editing an existing freeBlock marker shows the checkbox pre-checked", sheetEl.innerHTML.includes('id="mkFree" checked'));
+
+// -------- 保存時にチェックを外すと freeBlock:false に更新される --------
+elStore.mkFree.checked = false;
+dispatchClick("save-marker", { id: markerId });
+ok("unchecking and re-saving updates freeBlock to false", T.db.occurrences[0].freeBlock===false);
+
 console.log(fail === 0 ? "\nALL PASS" : `\n${fail} FAILURES`);
 process.exit(fail ? 1 : 0);

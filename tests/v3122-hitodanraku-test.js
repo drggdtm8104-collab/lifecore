@@ -153,6 +153,22 @@ ok("a deferred occurrence does not occupy time", gaps.length===1 && gaps[0].star
 // Test 5: fromKey >= untilKey -> empty
 ok("fromKey at/after untilKey returns no gaps", T.freeGapsFrom(TODAY, 1200, 1200).length===0);
 
+// Test 6: a plan block marked freeBlock:true does not occupy time (v3.123 fix —
+// e.g. a template's "自由時間" placeholder block should not block ひと段落's proposals)
+T.db.occurrences = [
+  { id:"b1", date:TODAY, plan:true, plannedStart:"18:00", plannedMin:120, status:"plan", freeBlock:true },
+];
+gaps = T.freeGapsFrom(TODAY, 1000, 1200);
+ok("a freeBlock:true plan occurrence does not occupy time", gaps.length===1 && gaps[0].start===1000 && gaps[0].end===1200);
+
+// Test 7: a freeBlock alongside a real (non-free) block only excludes the free one
+T.db.occurrences = [
+  { id:"b1", date:TODAY, plan:true, plannedStart:"18:00", plannedMin:30, status:"plan", freeBlock:true },   // 1080-1110, ignored
+  { id:"b2", date:TODAY, plannedStart:"19:00", plannedMin:30, status:"planned" },                             // 1140-1170, real
+];
+gaps = T.freeGapsFrom(TODAY, 1000, 1200);
+ok("a freeBlock plan is excluded while a real occupied block still splits the range", gaps.length===2 && gaps[0].end===1140 && gaps[1].start===1170);
+
 // ============================================================
 // skillBacklog()
 // ============================================================
