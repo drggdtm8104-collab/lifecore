@@ -100,7 +100,9 @@ T.sheetTask(null);
 ok("sheetTask() wraps its fields in .tk-form so the bold-label CSS scopes correctly", sheetEl.innerHTML.includes('class="tk-form"'));
 ok("the title field label is present inside the form", sheetEl.innerHTML.includes("<span>タイトル</span>"));
 
-// -------- 2. 「保存して追加」ボタンがあり、新規タスクを登録と同時に今日のToDoへ追加する --------
+// -------- 2. 「保存して追加」ボタンがあり、保存後は「ToDoリストに追加」で
+// タスクを選んだときと同じ、開始時刻を決める画面(sheetAddOcc)に続けて進む
+// （v3.127〜。即座には追加されない——「タスクを追加」ボタンで確定する） --------
 ok("sheetTask() shows a 保存して追加 button wired to save-task-add-today", sheetEl.innerHTML.includes('data-act="save-task-add-today"') && sheetEl.innerHTML.includes("保存して追加"));
 
 elStore.tkName = mkEl("tkName"); elStore.tkName.value = "新しい資格勉強";
@@ -110,7 +112,16 @@ dispatchClick("save-task-add-today");
 
 ok("save-task-add-today creates exactly one task", T.db.tasks.length===1 && T.db.tasks[0].name==="新しい資格勉強");
 const createdTaskId = T.db.tasks[0].id;
-ok("save-task-add-today also creates today's occurrence for that task, untimed with the task's estMin as the guide", T.db.occurrences.length===1 && T.db.occurrences[0].taskId===createdTaskId && T.db.occurrences[0].date===today && T.db.occurrences[0].plannedStart===null && T.db.occurrences[0].plannedMin===25 && T.db.occurrences[0].status==="planned");
+ok("save-task-add-today does NOT create an occurrence immediately", T.db.occurrences.length===0);
+ok("save-task-add-today instead transitions to the start-time sheet (sheetAddOcc) for the newly-created task", sheetEl.innerHTML.includes('data-act="add-today"') && sheetEl.innerHTML.includes(`data-id="${createdTaskId}"`) && sheetEl.innerHTML.includes('id="aoStart"'));
+
+// completing that follow-up screen (as if the user picked a time and confirmed)
+// creates the occurrence via the existing add-today path
+elStore.aoStart = mkEl("aoStart"); elStore.aoStart.value = "19:00";
+elStore.aoEnd = mkEl("aoEnd"); elStore.aoEnd.value = "";
+elStore.aoMin = mkEl("aoMin"); elStore.aoMin.value = "25";
+dispatchClick("add-today", { id: createdTaskId });
+ok("confirming the start-time screen creates today's occurrence with the chosen time", T.db.occurrences.length===1 && T.db.occurrences[0].taskId===createdTaskId && T.db.occurrences[0].date===today && T.db.occurrences[0].plannedStart==="19:00" && T.db.occurrences[0].status==="planned");
 
 // -------- plain save-task (no "add today") still works and does NOT create an occurrence --------
 T.db.tasks = [];

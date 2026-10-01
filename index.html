@@ -922,7 +922,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.126";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.127";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -4164,16 +4164,15 @@ document.addEventListener("click", e=>{
     }
     // v3.125: タスク登録と同時に今日のToDoリストにも追加できるボタン。
     // 保存だけして終わり→別途「ToDoリストに追加」で選び直す、という二度手間を
-    // 無くす。時間未定で置く（add-todayの「開始時刻を空欄のまま追加」と同じ
-    // 挙動）——時刻を決めたいときは従来どおり保存だけしてToDoリストから選ぶ。
+    // 無くす。v3.127: 最初は時間未定で即追加していたが、「ToDoリストに追加→
+    // タスクを選択」したときと同じ、開始時刻を決める画面（sheetAddOcc）に
+    // 続けて進むように変更——時刻を決めたい場合もその場で選べるようにする
+    // （「タスクを追加」ボタンを押すまでは実際には追加されない）。
     case "save-task-add-today": {
       const t = saveTaskFromForm(id);
       if(!t) break;
-      const carryNote = t.kind==="single" ? (latestOccOf(t.id)?.note || "") : "";
-      db.occurrences.push({ id:uid(), taskId:t.id, date:state.date, plannedStart:null, plannedMin:(t.estMin ?? null),
-        actualMin:null, status:"planned", doneAt:null, adhoc:false, meal:false, title:null, note:carryNote });
-      save(); closeSheet(); render();
-      toast("登録して今日のToDoリストに追加しました");
+      save();
+      sheetAddOcc(t.id);
       break;
     }
     case "tk-due-clear": {
