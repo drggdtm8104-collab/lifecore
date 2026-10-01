@@ -836,6 +836,10 @@
   }
   label.fld{display:block;margin-top:11px}
   label.fld > span{display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px}
+  /* v3.125: タスク登録・編集シートは項目が多く、項目名が他の文字と同じ太さだと
+     パッと見で何の設定か分かりにくいという指摘を受け、このシートの項目名だけ
+     太字にする（他のシートの.fldラベルには影響させない、スコープを絞った指定）。 */
+  .tk-form label.fld > span{font-weight:700;color:var(--ink)}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .radio-row{display:flex;gap:7px;flex-wrap:wrap}
   .radio-row button{
@@ -918,7 +922,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.124";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.125";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3461,7 +3465,12 @@ function sheetTodayPick(){
     }).join("");
   }
 
-  openSheet(`<h2>タスク一覧</h2>
+  openSheet(`<div class="sheet-sticky-head">
+      <h2>タスク一覧</h2>
+      <div class="sheet-sticky-actions">
+        <button class="btn tiny ghost" data-act="close-sheet">キャンセル</button>
+      </div>
+    </div>
     <p class="sheet-sub">選ぶと、開始時刻を決めるか、時間未定のまま追加するか選べます。</p>
     <div class="seg" style="margin:0 0 6px">
       <button class="${view==="single"?"on":""}" data-act="pick-view" data-v="single">完了型</button>
@@ -3682,9 +3691,11 @@ function sheetTask(taskId){
       <h2>${t?"タスクを編集":"タスクを登録"}</h2>
       <div class="sheet-sticky-actions">
         <button class="btn tiny ghost" data-act="close-sheet">キャンセル</button>
+        <button class="btn tiny" data-act="save-task-add-today" ${t?`data-id="${t.id}"`:""}>保存して追加</button>
         <button class="btn tiny primary" data-act="save-task" ${t?`data-id="${t.id}"`:""}>保存</button>
       </div>
     </div>
+    <div class="tk-form">
     <label class="fld"><span>タイトル</span><input type="text" id="tkName" value="${esc(t?.name||"")}" placeholder="例: 資格勉強"></label>
     <label class="fld"><span>タスクの型</span></label>
     <div class="radio-row" id="tkKind">
@@ -3744,7 +3755,58 @@ function sheetTask(taskId){
     ${latestOcc ? `<label class="fld"><span>進捗メモ（任意・${latestOcc.date===todayStr()?"今日":esc(fmtDateShort(latestOcc.date))+"時点"}の実施ぶん）</span><textarea id="tkProgress" class="fld-note" data-occid="${latestOcc.id}" placeholder="例: 第3章まで／下書きだけ・補足など">${esc(latestOcc.note||"")}</textarea></label>` : ""}
     ${t?`<div class="sheet-actions">
       <button class="btn ghost" style="color:var(--over)" data-act="del-task" data-id="${t.id}">削除</button>
-    </div>`:""}`);
+    </div>`:""}
+    </div>`);
+}
+
+// v3.125: sheetTaskのフォーム読み取り・保存を共通化（「保存」「保存して追加」の
+// 両方から使う）。バリデーション失敗時はnullを返す（フォーカス移動のみ行い、
+// 呼び出し側はbreakする）。
+function saveTaskFromForm(id){
+  const name = document.getElementById("tkName").value.trim();
+  if(!name){ document.getElementById("tkName").focus(); return null; }
+  const kind = document.querySelector("#tkKind button.on")?.dataset.v || "single";
+  const rawMin = document.getElementById("tkMin").value.trim();
+  const estMin = rawMin === "" ? null : (parseInt(rawMin,10) || null);   // blank = no duration
+  const cat = document.querySelector("#tkCat button.on")?.dataset.v || "その他";
+  const note = (document.getElementById("tkNote").value || "").trim();
+  const prio = kind==="single" ? (document.querySelector("#tkPrio button.on")?.dataset.v || "low") : "low";
+  // 期限・開始時期: 粒度が「日付」なら type=date の値をそのまま、それ以外は
+  // 「YYYY-MM」＋粒度から実効日（月末寄り=期限／月初寄り=開始）を計算する
+  const duePrec = kind==="single" ? (document.querySelector("#tkDuePrec button.on")?.dataset.v || "day") : "day";
+  let due = null;
+  if(kind==="single"){
+    if(duePrec==="day") due = document.getElementById("tkDue")?.value || null;
+    else { const mv = document.getElementById("tkDueMonth")?.value; due = mv ? effDateFromMonth(mv, duePrec, true) : null; }
+  }
+  const startPrec = kind==="single" ? (document.querySelector("#tkStartPrec button.on")?.dataset.v || "day") : "day";
+  let startDate = null;
+  if(kind==="single"){
+    if(startPrec==="day") startDate = document.getElementById("tkStart")?.value || null;
+    else { const mv = document.getElementById("tkStartMonth")?.value; startDate = mv ? effDateFromMonth(mv, startPrec, false) : null; }
+  }
+  let freq = null;
+  const rtype = kind==="repeat" ? (document.querySelector("#tkRtype button.on")?.dataset.v || "routine") : null;
+  if(kind==="repeat"){
+    const ft = document.querySelector("#tkFreq button.on")?.dataset.v || "daily";
+    freq = ft==="perWeek" ? { type:"perWeek", n: parseInt(document.getElementById("tkNv").textContent,10)||3 } : { type:"daily" };
+  }
+  let t;
+  if(id){
+    t = db.tasks.find(x=>x.id===id);
+    Object.assign(t, { name, kind, estMin, category:cat, freq, note, due, duePrec, prio, startDate, startPrec, rtype });
+  } else {
+    t = { id:uid(), name, kind, freq, estMin, category:cat, note, due, duePrec, prio, startDate, startPrec, rtype, done:false, createdAt:todayStr() };
+    db.tasks.push(t);
+  }
+  // v3.66: 今日の実施の進捗メモ（あれば）も一緒に保存 — ToDoリストのカードの
+  // 編集画面と同じ occurrence.note を書き換える（連動）
+  const progressEl = document.getElementById("tkProgress");
+  if(progressEl){
+    const occ = db.occurrences.find(o=>o.id===progressEl.dataset.occid);
+    if(occ) occ.note = progressEl.value.trim();
+  }
+  return t;
 }
 
 /* ============================================================
@@ -4090,48 +4152,23 @@ document.addEventListener("click", e=>{
       break;
     }
     case "save-task": {
-      const name = document.getElementById("tkName").value.trim();
-      if(!name){ document.getElementById("tkName").focus(); break; }
-      const kind = document.querySelector("#tkKind button.on")?.dataset.v || "single";
-      const rawMin = document.getElementById("tkMin").value.trim();
-      const estMin = rawMin === "" ? null : (parseInt(rawMin,10) || null);   // blank = no duration
-      const cat = document.querySelector("#tkCat button.on")?.dataset.v || "その他";
-      const note = (document.getElementById("tkNote").value || "").trim();
-      const prio = kind==="single" ? (document.querySelector("#tkPrio button.on")?.dataset.v || "low") : "low";
-      // 期限・開始時期: 粒度が「日付」なら type=date の値をそのまま、それ以外は
-      // 「YYYY-MM」＋粒度から実効日（月末寄り=期限／月初寄り=開始）を計算する
-      const duePrec = kind==="single" ? (document.querySelector("#tkDuePrec button.on")?.dataset.v || "day") : "day";
-      let due = null;
-      if(kind==="single"){
-        if(duePrec==="day") due = document.getElementById("tkDue")?.value || null;
-        else { const mv = document.getElementById("tkDueMonth")?.value; due = mv ? effDateFromMonth(mv, duePrec, true) : null; }
-      }
-      const startPrec = kind==="single" ? (document.querySelector("#tkStartPrec button.on")?.dataset.v || "day") : "day";
-      let startDate = null;
-      if(kind==="single"){
-        if(startPrec==="day") startDate = document.getElementById("tkStart")?.value || null;
-        else { const mv = document.getElementById("tkStartMonth")?.value; startDate = mv ? effDateFromMonth(mv, startPrec, false) : null; }
-      }
-      let freq = null;
-      const rtype = kind==="repeat" ? (document.querySelector("#tkRtype button.on")?.dataset.v || "routine") : null;
-      if(kind==="repeat"){
-        const ft = document.querySelector("#tkFreq button.on")?.dataset.v || "daily";
-        freq = ft==="perWeek" ? { type:"perWeek", n: parseInt(document.getElementById("tkNv").textContent,10)||3 } : { type:"daily" };
-      }
-      if(id){
-        const t = db.tasks.find(x=>x.id===id);
-        Object.assign(t, { name, kind, estMin, category:cat, freq, note, due, duePrec, prio, startDate, startPrec, rtype });
-      } else {
-        db.tasks.push({ id:uid(), name, kind, freq, estMin, category:cat, note, due, duePrec, prio, startDate, startPrec, rtype, done:false, createdAt:todayStr() });
-      }
-      // v3.66: 今日の実施の進捗メモ（あれば）も一緒に保存 — ToDoリストのカードの
-      // 編集画面と同じ occurrence.note を書き換える（連動）
-      const progressEl = document.getElementById("tkProgress");
-      if(progressEl){
-        const occ = db.occurrences.find(o=>o.id===progressEl.dataset.occid);
-        if(occ) occ.note = progressEl.value.trim();
-      }
+      const t = saveTaskFromForm(id);
+      if(!t) break;
       save(); closeSheet(); render(); break;
+    }
+    // v3.125: タスク登録と同時に今日のToDoリストにも追加できるボタン。
+    // 保存だけして終わり→別途「ToDoリストに追加」で選び直す、という二度手間を
+    // 無くす。時間未定で置く（add-todayの「開始時刻を空欄のまま追加」と同じ
+    // 挙動）——時刻を決めたいときは従来どおり保存だけしてToDoリストから選ぶ。
+    case "save-task-add-today": {
+      const t = saveTaskFromForm(id);
+      if(!t) break;
+      const carryNote = t.kind==="single" ? (latestOccOf(t.id)?.note || "") : "";
+      db.occurrences.push({ id:uid(), taskId:t.id, date:state.date, plannedStart:null, plannedMin:(t.estMin ?? null),
+        actualMin:null, status:"planned", doneAt:null, adhoc:false, meal:false, title:null, note:carryNote });
+      save(); closeSheet(); render();
+      toast("登録して今日のToDoリストに追加しました");
+      break;
     }
     case "tk-due-clear": {
       const e=document.getElementById("tkDue"); if(e) e.value="";
