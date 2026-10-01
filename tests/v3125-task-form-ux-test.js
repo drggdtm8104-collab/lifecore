@@ -140,12 +140,16 @@ elStore.tkName.value = "";
 dispatchClick("save-task-add-today");
 ok("save-task-add-today with an empty title creates nothing (validation still enforced)", T.db.tasks.length===0 && T.db.occurrences.length===0);
 
-// -------- 3. タスク一覧（ToDo追加）シートにヘッダー固定＋キャンセルがある --------
+// -------- 3. 「ToDoリストに追加」シート: タイトルをボタンと同じ文言にし、
+// 完了型/継続型の切替・並び順タブまでヘッダーごと固定にする（v3.128〜） --------
 T.db.tasks = [{ id:"t1", name:"候補タスク", kind:"single", freq:null, estMin:null, category:"その他", note:"", due:null, duePrec:"day", prio:"low", startDate:null, startPrec:"day", rtype:null, done:false, createdAt:today }];
 T.state.pickView = "single";
 T.sheetTodayPick();
-ok("sheetTodayPick() wraps its title in a sticky header", sheetEl.innerHTML.includes('class="sheet-sticky-head"') && sheetEl.innerHTML.includes("<h2>タスク一覧</h2>"));
-ok("sheetTodayPick()'s sticky header includes a cancel button back to the previous screen", sheetEl.innerHTML.includes('data-act="close-sheet"') && sheetEl.innerHTML.includes("キャンセル"));
+ok("sheetTodayPick()'s title now matches the FAB button label (ToDoリストに追加)", sheetEl.innerHTML.includes("<h2>ToDoリストに追加</h2>"));
+ok("the whole header block (title+cancel, view toggle, sort tabs) is wrapped in one sticky container", sheetEl.innerHTML.includes('class="sheet-sticky-block"'));
+ok("the title row and cancel button are inside that sticky block", sheetEl.innerHTML.includes('class="sheet-sticky-head"') && sheetEl.innerHTML.includes('data-act="close-sheet"') && sheetEl.innerHTML.includes("キャンセル"));
+ok("the 完了型/継続型 view-toggle tabs are inside the sticky block", sheetEl.innerHTML.includes('data-act="pick-view"'));
+ok("the 並び順 sort tabs are inside the sticky block (shown for the single/完了型 view)", sheetEl.innerHTML.includes('data-act="pick-sort"'));
 
 console.log(fail === 0 ? "\nALL PASS" : `\n${fail} FAILURES`);
 process.exit(fail ? 1 : 0);

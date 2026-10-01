@@ -879,6 +879,18 @@
   }
   .sheet-sticky-head h2{margin:0}
   .sheet-sticky-actions{display:flex;gap:6px;flex:none}
+  /* v3.128: 「ToDoリストに追加」画面は、タイトル行だけでなく完了型/継続型の
+     切替・並び順タブまで含めてスクロールしても常に見えるようにしたい、という
+     要望。.sheet-sticky-headは1行(タイトル+ボタン)専用のflex行なので、複数行を
+     まとめて固定するための外枠をこちらに用意し、中のsheet-sticky-head自体は
+     普通の行として並べる（二重にpositionを指定しないよう打ち消す）。 */
+  .sheet-sticky-block{
+    position:sticky;top:0;z-index:2;background:var(--ground);
+    margin:0 -2px 6px;padding:4px 2px 8px;border-bottom:1px solid var(--hairline);
+  }
+  .sheet-sticky-block .sheet-sticky-head{
+    position:static;margin:0 0 8px;padding:0;border-bottom:none;background:none;
+  }
   .sheet-actions{display:flex;gap:9px;margin-top:18px}
   .sheet-actions .btn{flex:1;min-height:44px;padding:11px;font-size:13.5px}
   .cand{
@@ -922,7 +934,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.127";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.128";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3465,18 +3477,20 @@ function sheetTodayPick(){
     }).join("");
   }
 
-  openSheet(`<div class="sheet-sticky-head">
-      <h2>タスク一覧</h2>
-      <div class="sheet-sticky-actions">
-        <button class="btn tiny ghost" data-act="close-sheet">キャンセル</button>
+  openSheet(`<div class="sheet-sticky-block">
+      <div class="sheet-sticky-head">
+        <h2>ToDoリストに追加</h2>
+        <div class="sheet-sticky-actions">
+          <button class="btn tiny ghost" data-act="close-sheet">キャンセル</button>
+        </div>
       </div>
+      <p class="sheet-sub">選ぶと、開始時刻を決めるか、時間未定のまま追加するか選べます。</p>
+      <div class="seg" style="margin:0 0 6px">
+        <button class="${view==="single"?"on":""}" data-act="pick-view" data-v="single">完了型</button>
+        <button class="${view==="repeat"?"on":""}" data-act="pick-view" data-v="repeat">継続型</button>
+      </div>
+      ${sortUI}
     </div>
-    <p class="sheet-sub">選ぶと、開始時刻を決めるか、時間未定のまま追加するか選べます。</p>
-    <div class="seg" style="margin:0 0 6px">
-      <button class="${view==="single"?"on":""}" data-act="pick-view" data-v="single">完了型</button>
-      <button class="${view==="repeat"?"on":""}" data-act="pick-view" data-v="repeat">継続型</button>
-    </div>
-    ${sortUI}
     <div>${body}</div>`);
 }
 
