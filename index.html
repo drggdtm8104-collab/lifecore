@@ -922,7 +922,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.125";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.126";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -4147,6 +4147,12 @@ document.addEventListener("click", e=>{
     case "del-task": {
       askConfirm("このタスクを削除しますか？\n（過去の記録は残ります）", ()=>{
         db.tasks = db.tasks.filter(t=>t.id!==id);
+        // v3.126: 「過去の記録は残ります」は完了・延期・未実施など決着済みの
+        // 実施の話で、まだ終わっていない実施（status:"planned"）はこれに
+        // 当たらない。これを残したままだとタスクが無いので occName() が
+        // 「(削除済み)」と表示し、ToDoリスト等に消せない項目として残って
+        // しまっていた——決着済みの記録は残し、未完了ぶんだけ一緒に削除する。
+        db.occurrences = db.occurrences.filter(o=>!(o.taskId===id && o.status==="planned"));
         save(); render(); toast("削除しました");
       });
       break;
