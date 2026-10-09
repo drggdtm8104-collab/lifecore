@@ -593,7 +593,7 @@
      抑えた（まぶしいとの指摘対応、ここから微調整していく）。 */
   .task-item.in-today-list{
     border:1px solid var(--primary);
-    box-shadow:0 0 2px 0 color-mix(in srgb, var(--primary) 20%, transparent);
+    box-shadow:0 0 2px 0 color-mix(in srgb, var(--primary) 10%, transparent);
   }
   .ti-meta-row{display:flex;align-items:center;gap:6px;margin-top:3px}
   .ti-meta-row .ti-meta{margin-top:0}
@@ -941,7 +941,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.146";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.147";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
