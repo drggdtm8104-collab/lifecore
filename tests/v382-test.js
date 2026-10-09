@@ -67,15 +67,18 @@ try {
   process.exit(1);
 }
 
-const seed = sandbox.seed;
+// app.jsはトップレベルの関数宣言も`let`/`const`も、このNode環境のvmサンドボックス
+// には自動で漏れてこない（エンジン依存で保証されない）。他のテストファイルと
+// 同じ`globalThis.__t = {...}`方式で明示的に取り出す。
+vm.runInContext(
+  "globalThis.__t = { seed, db, todayStr, cardHTML, sheetOccEdit, sheetTask, renderToday };",
+  sandbox
+);
+const { seed, todayStr, cardHTML, sheetOccEdit, sheetTask, renderToday } = sandbox.__t;
 if(typeof seed === "function") seed();
-
-let db = sandbox.db;
-const todayStr = sandbox.todayStr;
-const cardHTML = sandbox.cardHTML;
-const sheetOccEdit = sandbox.sheetOccEdit;
-const sheetTask = sandbox.sheetTask;
-const renderToday = sandbox.renderToday;
+// seed()はdbを再代入するだけなので、呼んだ後にもう一度__tを取り直す
+vm.runInContext("globalThis.__t.db = db;", sandbox);
+let db = sandbox.__t.db;
 
 let pass = 0, fail = 0;
 function check(name, cond){
@@ -107,16 +110,16 @@ db.occurrences.push({ id:"test-occ-3", taskId: t.id, date: todayStr(), plannedSt
 sheetOccEdit("test-occ-3");
 const sheetBody = getEl("sheet-body")?.innerHTML || sandbox.__lastSheetHTML || "";
 // openSheet likely sets some DOM; let's find via a hook — check function source instead as fallback
-const oeSrc = sandbox.sheetOccEdit.toString();
+const oeSrc = sheetOccEdit.toString();
 check("sheetOccEdit source has no oeActual field", !oeSrc.includes("oeActual") && !oeSrc.includes("実際にかかった時間"));
 
 // --- 4. sheetTask uses 備考 label instead of メモ for tkNote ---
-const tkSrc = sandbox.sheetTask.toString();
+const tkSrc = sheetTask.toString();
 check("sheetTask uses 備考 label for tkNote", tkSrc.includes("備考（任意）") && tkSrc.includes("tkNote"));
 check("sheetTask still has 進捗メモ label for tkProgress", tkSrc.includes("進捗メモ") );
 
 // --- 5. today view switcher has view-seg class ---
-const renderTodaySrc = sandbox.renderToday.toString();
+const renderTodaySrc = renderToday.toString();
 check("renderToday emits view-seg class on today/ToDo switch", renderTodaySrc.includes('class="seg today-seg view-seg"'));
 
 console.log(`\n${pass} passed, ${fail} failed`);

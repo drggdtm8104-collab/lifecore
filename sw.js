@@ -2,7 +2,7 @@
 //
 // 更新のたびに CACHE_VERSION を変える（例: "v3.108" のようにAPP_VERSIONと合わせる）。
 // 変えないと、古いキャッシュがいつまでも使われ続けて新しい版が反映されない。
-const CACHE_VERSION = "v3.131";
+const CACHE_VERSION = "v3.132";
 const CACHE_NAME = "lifecore-" + CACHE_VERSION;
 
 // 同一オリジンの、アプリを開くために最低限必要なファイルだけを事前キャッシュする。
@@ -74,6 +74,9 @@ self.addEventListener("push", (event) => {
       body: data.body || "",
       icon: "./icon-192.png",
       badge: "./icon-192.png",
+      // tag指定: プッシュサービス側の再送などで同じ通知が複数回届いても、
+      // 端末側では重複して積み重ならず1件の更新として扱われる。
+      tag: data.tag || undefined,
     })
   );
 });

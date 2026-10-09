@@ -183,6 +183,43 @@ async function main(){
     ok("a not-yet-due task among them is left alone", !sent.some(s=>s.includes("タスクC")));
   }
 
+  // -------- Test 8: tagがid+時刻で送信関数に渡される。プッシュサービス側の
+  // 再送で同じ通知が複数回届いても、端末側でtagにより1件にまとまるように
+  // するための仕組み（実際に通知が重複して何通も届いた不具合の対応）。 --------
+  {
+    const env = { SUBS: mkKvMock({
+      digest: JSON.stringify({ date: today, tasks: [ { id:"tagged", name:"タグ付きタスク", time:"12:00" } ] }),
+    }) };
+    const tags = [];
+    await checkAndSendDueTasks(env, jstNoonUtcMs, async (env, body, tag) => { tags.push(tag); });
+    ok("the send tag is the id+time sent-set key", tags.length === 1 && tags[0] === "tagged:12:00");
+  }
+
+  // -------- Test 9: /subscribeは新しい購読を保存する前に、他の古い購読を
+  // 全部消す（このアプリは1人運用前提で購読は常に1件だけのはず。ホーム
+  // 画面への再追加などで古い購読が残ったまま新しい購読が増え、1件のタスク
+  // 通知が購読数だけ重複して届いた実際の不具合の修正）。 --------
+  {
+    const env = {
+      SHARED_SECRET: "secret123",
+      SUBS: mkKvMock({
+        "sub:old1": JSON.stringify({ endpoint: "https://example.com/old1" }),
+        "sub:old2": JSON.stringify({ endpoint: "https://example.com/old2" }),
+      }),
+    };
+    const fakeRequest = {
+      url: "https://lifecore-push.example.workers.dev/subscribe",
+      method: "POST",
+      headers: { get: (name) => (name === "X-LifeCore-Token" ? "secret123" : null) },
+      json: async () => ({ endpoint: "https://example.com/new", keys: { p256dh: "x", auth: "y" } }),
+    };
+    const res = await mod.default.fetch(fakeRequest, env);
+    ok("subscribe responds 200", res.status === 200);
+    const keys = (await env.SUBS.list({ prefix: "sub:" })).keys.map(k => k.name);
+    ok("only the newly-subscribed endpoint remains", keys.length === 1 && keys[0] !== "sub:old1" && keys[0] !== "sub:old2");
+    ok("the old subscriptions were actually deleted", !env.SUBS._store.has("sub:old1") && !env.SUBS._store.has("sub:old2"));
+  }
+
   console.log(fail === 0 ? "\nALL PASS" : `\n${fail} FAILURES`);
   process.exit(fail ? 1 : 0);
 }
