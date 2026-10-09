@@ -934,7 +934,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.135";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.136";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2589,10 +2589,12 @@ function cardHTML(o, listView){
   // 個別の位置指定が無く、タイトルの直後＝タイトルが短いと状態バッジから
   // 離れて見えるという不具合があったのをv3.85で修正）。ToDoリスト
   // （listView）でのみ表示、タイムテーブル側には出さない。
-  // 枠のサイズ（padding/border-radius/font-size）と上限幅は状態バッジ
-  // （.card-state）に合わせる——編集・未達成どちらも同じ上限幅にして、
-  // 文字数（編集=2字／未達成=3字）で見た目の大きさが揃わなくなるのを防ぐ。
-  const chipStyle = "border-color:currentColor;padding:2px 6px;border-radius:6px;font-size:10.5px;min-height:0;max-width:44px;overflow:hidden;text-overflow:ellipsis";
+  // 枠のサイズは「内側」(padding/font-size)からの逆算ではなく「外側」
+  // (width/height)を直接指定する——文字のレンダリング幅を推測する必要が
+  // なくなり、サイズ調整が必要なときもこの数値を直接変えるだけで済む。
+  // 編集・未達成は同じ外枠サイズにして、文字数（編集=2字／未達成=3字）で
+  // 見た目の大きさが揃わなくなるのを防ぐ。
+  const chipStyle = "border-color:currentColor;box-sizing:border-box;width:46px;height:24px;padding:0;border-radius:6px;font-size:11px;overflow:hidden;text-overflow:ellipsis";
   const editBtn = `<button class="btn ghost tiny" style="${chipStyle}" data-act="edit-occ" data-id="${o.id}">編集</button>`;
 
   // v3.133: 「未達成」— 時間が決まっている継続型タスク（朝の水分補給など）は、
