@@ -934,7 +934,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.140";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.141";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2589,10 +2589,9 @@ function cardHTML(o, listView){
   // 個別の位置指定が無く、タイトルの直後＝タイトルが短いと状態バッジから
   // 離れて見えるという不具合があったのをv3.85で修正）。ToDoリスト
   // （listView）でのみ表示、タイムテーブル側には出さない。
-  // v3.135時点の設定（line-height上書きなし→.btnのline-height:1がそのまま
-  // 効いて最も詰まった高さになっていたもの）に戻す。横幅はユーザー確認済み
-  // の45pxを維持。min-height:0は.btn.tinyのmin-height:26pxを打ち消すために必要。
-  const chipStyle = "border-color:currentColor;box-sizing:border-box;width:45px;padding:2px 6px;border-radius:6px;font-size:10.5px;min-height:0;overflow:hidden;text-overflow:ellipsis";
+  // 高さは計算式（padding+line-height）任せではなく、直接18pxを指定する
+  // （box-sizing:border-boxで枠線込みの外側サイズとして確定させる）。
+  const chipStyle = "border-color:currentColor;box-sizing:border-box;width:45px;height:18px;padding:0;border-radius:6px;font-size:10.5px;overflow:hidden;text-overflow:ellipsis";
   const editBtn = `<button class="btn ghost tiny" style="${chipStyle}" data-act="edit-occ" data-id="${o.id}">編集</button>`;
 
   // v3.133: 「未達成」— 時間が決まっている継続型タスク（朝の水分補給など）は、
