@@ -589,12 +589,11 @@
     border-radius:10px;padding:9px 11px;box-shadow:var(--shadow);width:100%;text-align:left;
   }
   /* お試し実装: 今日のToDoリストに追加ずみ（今日の日付のoccurrenceがある）
-     タスクの枠を強調する。タブ選択(.view-seg button.on)と同じ「枠線＋淡い
-     グロー」の静的な強調を流用——flash-highlightの点滅は別用途（ジャンプ
-     先の一時的な目印）なので使わない。 */
+     タスクの枠を強調する。当初var(--primary)の緑グローにしていたが
+     「まぶしい」との指摘で白に変更。 */
   .task-item.in-today-list{
-    border:1px solid var(--primary);
-    box-shadow:0 0 4px 0 color-mix(in srgb, var(--primary) 40%, transparent);
+    border:1px solid #fff;
+    box-shadow:0 0 4px 0 rgba(255,255,255,.4);
   }
   .ti-meta-row{display:flex;align-items:center;gap:6px;margin-top:3px}
   .ti-meta-row .ti-meta{margin-top:0}
@@ -942,7 +941,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.144";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.145";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
