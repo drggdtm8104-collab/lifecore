@@ -934,7 +934,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.142";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.143";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2595,7 +2595,7 @@ function cardHTML(o, listView){
   // 上書きしていなかったため、heightを何pxに指定してもmin-heightが優先
   // されて実際には常に26pxにクランプされていた（「最細の時以外は同じ太さ
   // に見える」という指摘の原因）。min-height:0を明示して打ち消す。
-  const chipStyle = "border-color:currentColor;box-sizing:border-box;width:45px;height:18px;min-height:0;padding:0;border-radius:6px;font-size:10.5px;overflow:hidden;text-overflow:ellipsis";
+  const chipStyle = "border-color:currentColor;box-sizing:border-box;width:45px;height:19px;min-height:0;padding:0;border-radius:6px;font-size:10.5px;overflow:hidden;text-overflow:ellipsis";
   const editBtn = `<button class="btn ghost tiny" style="${chipStyle}" data-act="edit-occ" data-id="${o.id}">編集</button>`;
 
   // v3.133: 「未達成」— 時間が決まっている継続型タスク（朝の水分補給など）は、
