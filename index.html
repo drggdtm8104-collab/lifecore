@@ -934,7 +934,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.133";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.134";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2589,7 +2589,7 @@ function cardHTML(o, listView){
   // 個別の位置指定が無く、タイトルの直後＝タイトルが短いと状態バッジから
   // 離れて見えるという不具合があったのをv3.85で修正）。ToDoリスト
   // （listView）でのみ表示、タイムテーブル側には出さない。
-  const editBtn = `<button class="btn ghost tiny" data-act="edit-occ" data-id="${o.id}">編集</button>`;
+  const editBtn = `<button class="btn ghost tiny" style="border-color:currentColor" data-act="edit-occ" data-id="${o.id}">編集</button>`;
 
   // v3.133: 「未達成」— 時間が決まっている継続型タスク（朝の水分補給など）は、
   // 時間を過ぎてからまとめてやっても意味がないことがある。見送り(skipped)
@@ -2597,7 +2597,7 @@ function cardHTML(o, listView){
   // という記録を残せるようにする。既存のdone⇔planned用トグル（toggle-occ-done）
   // と同じ考え方で、skipped⇔planned をトグルする。編集ボタンと状態バッジの
   // 間に固定表示（listViewのみ、編集ボタンと同じ扱い）。
-  const unmetBtn = `<button class="btn ghost tiny" data-act="toggle-occ-unmet" data-id="${o.id}">未達成</button>`;
+  const unmetBtn = `<button class="btn ghost tiny" style="border-color:currentColor" data-act="toggle-occ-unmet" data-id="${o.id}">未達成</button>`;
 
   // time shown INSIDE the card: full range when a duration is set, otherwise just
   // the start time (only where the card isn't already under a timeline time-label)
