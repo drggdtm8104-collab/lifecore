@@ -587,13 +587,15 @@
     display:flex;align-items:center;gap:10px;cursor:pointer;
     background:var(--surface);border:1px solid var(--hairline);
     border-radius:10px;padding:9px 11px;box-shadow:var(--shadow);width:100%;text-align:left;
+    position:relative;
   }
   /* お試し実装: 今日のToDoリストに追加ずみ（今日の日付のoccurrenceがある）
-     タスクの枠を強調する。緑に戻し、グローはぼかし・不透明度を下げて
-     抑えた（まぶしいとの指摘対応、ここから微調整していく）。 */
-  .task-item.in-today-list{
-    border:1px solid var(--primary);
-    box-shadow:0 0 2px 0 color-mix(in srgb, var(--primary) 10%, transparent);
+     タスクの目印。枠線＋グローの強調（まぶしい／変化が分かりにくいとの
+     指摘）から、右上に出す「しおり」形の小さな緑マークに変更。 */
+  .task-today-flag{
+    position:absolute;top:0;right:10px;width:12px;height:16px;
+    background:var(--primary);
+    clip-path:polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
   }
   .ti-meta-row{display:flex;align-items:center;gap:6px;margin-top:3px}
   .ti-meta-row .ti-meta{margin-top:0}
@@ -941,7 +943,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.147";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.148";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2738,7 +2740,8 @@ function renderTasks(){
       const hasNote = !!(note || progressNote);
       const noteOpen = hasNote && state._noteOpen && state._noteOpen.has(t.id);
       const inTodayList = hasOccToday(t.id, T);
-      return `<div class="task-item${inTodayList?" in-today-list":""}" data-act="edit-task" data-id="${t.id}">
+      return `<div class="task-item" data-act="edit-task" data-id="${t.id}">
+        ${inTodayList?`<span class="task-today-flag"></span>`:""}
         <div style="flex:1;min-width:0">
           <div class="ti-name">${esc(t.name)}</div>
           <div class="ti-meta-row">
@@ -2794,7 +2797,8 @@ function renderTasks(){
         badge = `<span class="ti-freq">毎日</span>`;
       }
       const inTodayList = hasOccToday(t.id, T);
-      return `<button class="task-item${inTodayList?" in-today-list":""}" data-act="edit-task" data-id="${t.id}">
+      return `<button class="task-item" data-act="edit-task" data-id="${t.id}">
+        ${inTodayList?`<span class="task-today-flag"></span>`:""}
         <div style="flex:1;min-width:0">
           <div class="ti-name">${esc(t.name)}</div>
           <div class="ti-meta">${rtypeChip(t)}${badge}<span class="ti-cat">${esc(t.category||"—")}</span></div>

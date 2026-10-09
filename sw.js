@@ -2,7 +2,7 @@
 //
 // 更新のたびに CACHE_VERSION を変える（例: "v3.108" のようにAPP_VERSIONと合わせる）。
 // 変えないと、古いキャッシュがいつまでも使われ続けて新しい版が反映されない。
-const CACHE_VERSION = "v3.147";
+const CACHE_VERSION = "v3.148";
 const CACHE_NAME = "lifecore-" + CACHE_VERSION;
 
 // 同一オリジンの、アプリを開くために最低限必要なファイルだけを事前キャッシュする。
