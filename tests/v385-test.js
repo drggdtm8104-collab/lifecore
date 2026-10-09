@@ -71,8 +71,11 @@ function check(name, cond){
 }
 
 const srcCardHTML = sandbox.cardHTML.toString();
-check("cardHTML wraps editBtn+statusHTML in one card-head-actions span", srcCardHTML.includes('<span class="card-head-actions">${listView ? editBtn : ""}${statusHTML}</span>'));
-check("cardHTML title span has no separate editBtn/statusHTML siblings before wrapper", !srcCardHTML.includes('${listView ? editBtn : ""}\n      ${statusHTML}'));
+// v3.133: 「未達成」ボタン(unmetBtn)がeditBtnとstatusHTMLの間に追加されたため、
+// この行のリテラルも更新。card-head-actionsが1つのspanにまとめる構造自体は
+// 変わっていない（v3.85の不具合修正はそのまま維持）。
+check("cardHTML wraps editBtn+unmetBtn+statusHTML in one card-head-actions span", srcCardHTML.includes('<span class="card-head-actions">${listView ? editBtn + unmetBtn : ""}${statusHTML}</span>'));
+check("cardHTML title span has no separate editBtn/statusHTML siblings before wrapper", !srcCardHTML.includes('${listView ? editBtn + unmetBtn : ""}\n      ${statusHTML}'));
 
 // simulate long title: verify occName truncation is CSS-driven, not JS-truncated
 // (title text itself isn't cut in HTML; ellipsis is purely CSS: white-space:nowrap + text-overflow:ellipsis)

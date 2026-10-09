@@ -934,7 +934,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.132";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.133";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2591,6 +2591,14 @@ function cardHTML(o, listView){
   // （listView）でのみ表示、タイムテーブル側には出さない。
   const editBtn = `<button class="btn ghost tiny" data-act="edit-occ" data-id="${o.id}">編集</button>`;
 
+  // v3.133: 「未達成」— 時間が決まっている継続型タスク（朝の水分補給など）は、
+  // 時間を過ぎてからまとめてやっても意味がないことがある。見送り(skipped)
+  // ステータスを手動でトグルできるようにし、そういう実施に「できなかった」
+  // という記録を残せるようにする。既存のdone⇔planned用トグル（toggle-occ-done）
+  // と同じ考え方で、skipped⇔planned をトグルする。編集ボタンと状態バッジの
+  // 間に固定表示（listViewのみ、編集ボタンと同じ扱い）。
+  const unmetBtn = `<button class="btn ghost tiny" data-act="toggle-occ-unmet" data-id="${o.id}">未達成</button>`;
+
   // time shown INSIDE the card: full range when a duration is set, otherwise just
   // the start time (only where the card isn't already under a timeline time-label)
   let range = "";
@@ -2631,7 +2639,7 @@ function cardHTML(o, listView){
   return `<div class="card ${isSet?"is-set":""}${highlight?" flash-highlight":""}" id="occ-${o.id}">
     <div class="card-head">
       <span class="card-title">${esc(occName(o))}</span>
-      <span class="card-head-actions">${listView ? editBtn : ""}${statusHTML}</span>
+      <span class="card-head-actions">${listView ? editBtn + unmetBtn : ""}${statusHTML}</span>
     </div>
     ${listView ? `<div class="card-meta">
       ${metaChips}
@@ -4043,6 +4051,22 @@ document.addEventListener("click", e=>{
         o.status="done"; o.doneAt=stamp(o.date);
         if(o.actualMin==null) o.actualMin = o.plannedMin || t?.estMin || 0;
         if(t && t.kind==="single") t.done = true;
+      }
+      save(); render(); break;
+    }
+    // v3.133: 「未達成」ボタン——時間指定の継続型タスクなど、時間を過ぎてから
+    // やっても意味がないものに「できなかった」の記録を残す。toggle-occ-done
+    // と同じ考え方でskipped⇔plannedをトグルする（もう一度押せば前の状態＝
+    // 未完了に戻る）。見送り(skipped)は既存のisSet判定に含まれているため、
+    // 完了と同じく「完了」グループへ移動する（追加の分岐は不要）。
+    case "toggle-occ-unmet": {
+      const o = db.occurrences.find(x=>x.id===id); if(!o) break;
+      const t = taskOf(o);
+      if(o.status==="skipped"){
+        o.status="planned";
+      } else {
+        o.status="skipped"; o.actualMin=null; o.doneAt=null;
+        if(t && t.kind==="single") t.done=false;
       }
       save(); render(); break;
     }
