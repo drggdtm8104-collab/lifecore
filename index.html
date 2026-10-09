@@ -588,6 +588,14 @@
     background:var(--surface);border:1px solid var(--hairline);
     border-radius:10px;padding:9px 11px;box-shadow:var(--shadow);width:100%;text-align:left;
   }
+  /* お試し実装: 今日のToDoリストに追加ずみ（今日の日付のoccurrenceがある）
+     タスクの枠を強調する。タブ選択(.view-seg button.on)と同じ「枠線＋淡い
+     グロー」の静的な強調を流用——flash-highlightの点滅は別用途（ジャンプ
+     先の一時的な目印）なので使わない。 */
+  .task-item.in-today-list{
+    border:1px solid var(--primary);
+    box-shadow:0 0 4px 0 color-mix(in srgb, var(--primary) 40%, transparent);
+  }
   .ti-meta-row{display:flex;align-items:center;gap:6px;margin-top:3px}
   .ti-meta-row .ti-meta{margin-top:0}
   .task-item .ti-name{font-weight:500;font-size:12.5px}
@@ -934,7 +942,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.143";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.144";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2722,6 +2730,7 @@ function renderTasks(){
     // <button> だと中にもう1つ <button>（メモトグル）を入れられないため、
     // 行全体を <div data-act="edit-task"> にして、クリック委譲はそのまま活かす
     // （メモトグル自身がタップされた時はそちらの data-act が優先される）。
+    const T = todayStr();
     const singleRow = t => {
       const latestOcc = latestOccOf(t.id);
       const note = t.note || "";
@@ -2729,7 +2738,8 @@ function renderTasks(){
       const progressIsToday = latestOcc?.date === todayStr();
       const hasNote = !!(note || progressNote);
       const noteOpen = hasNote && state._noteOpen && state._noteOpen.has(t.id);
-      return `<div class="task-item" data-act="edit-task" data-id="${t.id}">
+      const inTodayList = hasOccToday(t.id, T);
+      return `<div class="task-item${inTodayList?" in-today-list":""}" data-act="edit-task" data-id="${t.id}">
         <div style="flex:1;min-width:0">
           <div class="ti-name">${esc(t.name)}</div>
           <div class="ti-meta-row">
@@ -2775,6 +2785,7 @@ function renderTasks(){
     // 日付なしのフラットな一覧を別途持つ価値が薄く、際限なく蓄積もして
     // いた（ユーザーの指摘による）。
   } else {
+    const T = todayStr();
     const repeatRow = t => {
       let badge = "";
       if(t.freq?.type==="perWeek"){
@@ -2783,7 +2794,8 @@ function renderTasks(){
       } else {
         badge = `<span class="ti-freq">毎日</span>`;
       }
-      return `<button class="task-item" data-act="edit-task" data-id="${t.id}">
+      const inTodayList = hasOccToday(t.id, T);
+      return `<button class="task-item${inTodayList?" in-today-list":""}" data-act="edit-task" data-id="${t.id}">
         <div style="flex:1;min-width:0">
           <div class="ti-name">${esc(t.name)}</div>
           <div class="ti-meta">${rtypeChip(t)}${badge}<span class="ti-cat">${esc(t.category||"—")}</span></div>
