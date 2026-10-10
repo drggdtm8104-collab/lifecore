@@ -128,6 +128,72 @@
     --wash:#283530;
     --shadow:0 1px 2px rgba(0,0,0,.32), 0 3px 14px rgba(0,0,0,.36);
   }
+  /* v3.154お試し: 既存5つ(light/green/dark/softlight/softdark)は保留の
+     まま、さらに3つ追加。緑(primary/done等)は変えず、light側かgreen/dark
+     側のどちらかと完全に同じ値を使い、背景の明るさだけ変える方針を継続。 */
+  /* 候補その3: softlightよりさらに一段暗い（まぶしさを抑えた）明るい
+     グレー。緑はlightと同じ。 */
+  :root[data-theme="lightgrey"]{
+    color-scheme:light;
+    --ground:#D7D8D2;
+    --surface:#E1E2DC;
+    --surface-2:#C9CAC3;
+    --ink:#1E2529;
+    --muted:#5F6866;
+    --faint:#98A19D;
+    --hairline:#C0C1B9;
+    --primary:#2F6F5E;
+    --primary-ink:#22574A;
+    --on-primary:#FFFFFF;
+    --done:#2F6F5E;
+    --partial:#A9791C;
+    --defer:#868C97;
+    --over:#B4482E;
+    --wash:#E9F1EE;
+    --shadow:0 1px 2px rgba(22,32,29,.08), 0 3px 12px rgba(22,32,29,.09);
+  }
+  /* 候補その4: softdarkより一段暗い、暖色の濃いチャコール（darkの真っ黒
+     とsoftdarkの中間）。緑はgreen/darkと同じ。 */
+  :root[data-theme="charcoal"]{
+    color-scheme:dark;
+    --ground:#161718;
+    --surface:#1E2021;
+    --surface-2:#272829;
+    --ink:#E7EAE4;
+    --muted:#9AA39E;
+    --faint:#6C766F;
+    --hairline:#303133;
+    --primary:#5FB79E;
+    --primary-ink:#8CD0BC;
+    --on-primary:#0E1513;
+    --done:#5FB79E;
+    --partial:#D8A54A;
+    --defer:#868C97;
+    --over:#DB7D63;
+    --wash:#1C2622;
+    --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
+  }
+  /* 候補その5: 「明るい」「暗い」のどちらでもない、中間くらいの明るさの
+     グレー。文字は白系（暗い側に近いので）、緑はgreen/darkと同じ。 */
+  :root[data-theme="midgrey"]{
+    color-scheme:dark;
+    --ground:#4B4D49;
+    --surface:#555750;
+    --surface-2:#606259;
+    --ink:#F1F1EC;
+    --muted:#C9CAC3;
+    --faint:#9A9B94;
+    --hairline:#6A6C64;
+    --primary:#5FB79E;
+    --primary-ink:#8CD0BC;
+    --on-primary:#13211C;
+    --done:#5FB79E;
+    --partial:#D8A54A;
+    --defer:#D0D1CB;
+    --over:#DB7D63;
+    --wash:#3A4A42;
+    --shadow:0 1px 2px rgba(0,0,0,.22), 0 3px 12px rgba(0,0,0,.25);
+  }
 
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
@@ -904,12 +970,22 @@
     border:1px solid var(--hairline);border-radius:6px;padding:0;cursor:pointer;
   }
   .note-expand-btn svg{width:14px;height:14px}
-  /* メモのポップアウト編集画面。シート(z-index:50)より上に重ねる。 */
+  /* v3.154: メモのポップアウトは全画面ではなく、予定・タスクの編集シート
+     (.sheet)と同じ考え方——下から立ち上がる独立した枠で、横幅はシートと
+     同じ、縦だけタイトルの少し下あたりまで大きく伸ばす。シート自体の
+     z-index:50より上に重ねる。 */
+  .note-popout-wrap{position:fixed;inset:0;z-index:60;display:none}
+  .note-popout-wrap.open{display:block}
+  .note-popout-bg{position:absolute;inset:0;background:rgba(15,20,18,.42)}
   .note-popout{
-    position:fixed;inset:0;z-index:60;background:var(--surface);
-    display:flex;flex-direction:column;padding:14px;padding-top:calc(14px + env(safe-area-inset-top,0));
+    position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+    width:100%;max-width:480px;height:88vh;
+    background:var(--ground);
+    border-radius:18px 18px 0 0;border-top:1px solid var(--hairline);
+    display:flex;flex-direction:column;
+    padding:14px 18px calc(14px + env(safe-area-inset-bottom,0));
+    animation:rise .22s cubic-bezier(.2,.7,.3,1);
   }
-  .note-popout[hidden]{display:none}
   .note-popout-head{
     display:flex;align-items:center;justify-content:space-between;
     margin-bottom:10px;flex:none;
@@ -1017,12 +1093,15 @@
   <div class="sheet-bg" data-act="close-sheet"></div>
   <div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
 </div>
-<div class="note-popout" id="notePopout" hidden role="dialog" aria-modal="true">
-  <div class="note-popout-head">
-    <span>メモ</span>
-    <button type="button" class="btn ghost tiny" data-act="close-note-popout">閉じる</button>
+<div class="note-popout-wrap" id="notePopoutWrap">
+  <div class="note-popout-bg" data-act="close-note-popout"></div>
+  <div class="note-popout" id="notePopout" role="dialog" aria-modal="true">
+    <div class="note-popout-head">
+      <span>メモ</span>
+      <button type="button" class="btn ghost tiny" data-act="close-note-popout">閉じる</button>
+    </div>
+    <textarea id="notePopoutArea"></textarea>
   </div>
-  <textarea id="notePopoutArea"></textarea>
 </div>
 
 <script>
@@ -1036,7 +1115,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.153";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.154";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2324,7 +2403,7 @@ const FABM = document.getElementById("fabMenu");
 const FABTOP = document.getElementById("fabTop");
 
 /* appearance: one of light / green / dark (green = the original dark palette) */
-const THEMES = ["light","green","dark","softlight","softdark"];
+const THEMES = ["light","green","dark","softlight","softdark","lightgrey","charcoal","midgrey"];
 function applyTheme(){
   const t = THEMES.includes(settings().theme) ? settings().theme : "green";
   document.documentElement.dataset.theme = t;
@@ -3348,9 +3427,11 @@ function renderSettings(){
   </div>`;
 
   html += setCard("appearance", "外観", ()=>
-    `<p>背景の色。「ソフトライト」「ソフトダーク」はお試し候補——緑のアクセントは変えず、背景の明るさだけを真っ白／真っ黒から少しずらしたもの。「ライト」が見づらいという指摘への代わりの案で、良ければ後で「ライト」を削除する。</p>
+    `<p>背景の色。「(お試し)」は候補——どれも緑のアクセントは変えず、背景の明るさだけを真っ白／真っ黒から少しずらしたもの。「ライト」が見づらいという指摘への代わりの案で、良ければ後で「ライト」を削除する。</p>
      <div class="seg" style="flex-wrap:wrap">
-       ${[["dark","ダーク"],["green","グリーン"],["light","ライト"],["softlight","ソフトライト(お試し)"],["softdark","ソフトダーク(お試し)"]].map(([v,l])=>
+       ${[["dark","ダーク"],["green","グリーン"],["light","ライト"],
+          ["softlight","ソフトライト(お試し)"],["softdark","ソフトダーク(お試し)"],
+          ["lightgrey","ライトグレー(お試し)"],["charcoal","チャコール(お試し)"],["midgrey","ミッドグレー(お試し)"]].map(([v,l])=>
          `<button class="${(THEMES.includes(settings().theme)?settings().theme:"green")===v?"on":""}" data-act="set-theme" data-v="${v}">${l}</button>`).join("")}
      </div>`);
 
@@ -4040,14 +4121,14 @@ document.addEventListener("click", e=>{
       if(!src) break;
       state._notePopoutId = id;
       document.getElementById("notePopoutArea").value = src.value;
-      document.getElementById("notePopout").hidden = false;
+      document.getElementById("notePopoutWrap").classList.add("open");
       break;
     }
     case "close-note-popout": {
       const src = state._notePopoutId ? document.getElementById(state._notePopoutId) : null;
       if(src) src.value = document.getElementById("notePopoutArea").value;
       state._notePopoutId = null;
-      document.getElementById("notePopout").hidden = true;
+      document.getElementById("notePopoutWrap").classList.remove("open");
       break;
     }
     case "go-tpl-edit": {

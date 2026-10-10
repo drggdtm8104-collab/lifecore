@@ -102,26 +102,28 @@ function dispatchClick(dataAct, extra){
   ok("the button uses the icon, not a text label", html.includes(T.NOTE_EXPAND_ICON) && !html.includes(">拡大<"));
 }
 
-// v3.153-2: open-note-popoutは元のtextareaの中身をポップアウト側の
+// v3.154: open-note-popoutは元のtextareaの中身をポップアウト側の
 // textareaへコピーして表示を開き、close-note-popoutは逆に書き戻して
 // 閉じる。どちらもsave()/render()は呼ばない（呼ぶと入力中の未保存
-// テキストが消えるため）。
+// テキストが消えるため）。ポップアウトは予定・タスクの編集シートと同じ
+// 「下から立ち上がる枠」方式（全画面ではない）なので、表示/非表示は
+// #notePopoutWrapの.openクラスで切り替える。
 {
   const src = getEl("myNote2");
   src.value = "元の内容";
-  const popout = getEl("notePopout");
+  const wrap = getEl("notePopoutWrap");
   const popoutArea = getEl("notePopoutArea");
-  popout.hidden = true;
+  wrap.classList.remove("open");
 
   dispatchClick("open-note-popout", { id:"myNote2" });
   ok("opening copies the source value into the popout textarea", popoutArea.value === "元の内容");
-  ok("opening un-hides the popout", popout.hidden === false);
+  ok("opening adds the open class to the wrap", wrap.classList.contains("open"));
   ok("state remembers which textarea to write back to", T.state._notePopoutId === "myNote2");
 
   popoutArea.value = "編集後の内容";
   dispatchClick("close-note-popout");
   ok("closing writes the edited text back to the source textarea", src.value === "編集後の内容");
-  ok("closing hides the popout again", popout.hidden === true);
+  ok("closing removes the open class from the wrap", !wrap.classList.contains("open"));
   ok("state's remembered id is cleared after closing", T.state._notePopoutId === null);
 }
 
