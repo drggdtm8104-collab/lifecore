@@ -42,26 +42,10 @@
   }
   :root[data-theme="light"]{ color-scheme:light; }
 
-  /* explicit dark choices. GREEN = the original green-tinted dark. DARK = neutral black. */
-  :root[data-theme="green"]{
-    color-scheme:dark;
-    --ground:#121614;
-    --surface:#1A201E;
-    --surface-2:#232A27;
-    --ink:#E7EAE4;
-    --muted:#9AA39E;
-    --faint:#6C766F;
-    --hairline:#2B332F;
-    --primary:#5FB79E;
-    --primary-ink:#8CD0BC;
-    --on-primary:#0E1513;
-    --done:#5FB79E;
-    --partial:#D8A54A;
-    --defer:#818A94;
-    --over:#DB7D63;
-    --wash:#1E2E29;
-    --shadow:0 1px 2px rgba(0,0,0,.30), 0 3px 14px rgba(0,0,0,.34);
-  }
+  /* v3.156: 色の最終選定（指示により確定）。候補から
+     ダーク/ライト/サンド/ローズグレー/ネイビー/フォレスト/ウォームグレーの
+     7つだけ残し、グリーン・ミスト・セージ・スレート・コーヒー・プラムは
+     削除した。 */
   :root[data-theme="dark"]{
     color-scheme:dark;
     --ground:#0C0C0C;
@@ -81,12 +65,6 @@
     --wash:#182420;
     --shadow:0 1px 2px rgba(0,0,0,.40), 0 3px 14px rgba(0,0,0,.46);
   }
-  /* v3.155お試し(全クリアしてやり直し): 前回(v3.152-154)は結局「白黒の
-     明るさを変えただけ」という指摘のため、お試し候補を全部消して作り直す。
-     今回は背景に実際に色味（暖色/冷色/緑み寄りなど）の違う系統を10種類
-     混ぜる。緑のアクセント(primary/done等)は、明るい系はlightと、暗い系
-     はgreen/darkと完全に同じ値を使う（引き続きそこは変えない）。 */
-  /* --- 明るい系 4種 --- */
   :root[data-theme="sand"]{
     color-scheme:light;
     --ground:#E8E0CC; --surface:#F0E9D8; --surface-2:#DED5BE;
@@ -94,22 +72,6 @@
     --primary:#2F6F5E; --primary-ink:#22574A; --on-primary:#FFFFFF; --done:#2F6F5E;
     --partial:#A9791C; --defer:#868C97; --over:#B4482E; --wash:#E9F1EE;
     --shadow:0 1px 2px rgba(40,35,20,.08), 0 3px 12px rgba(40,35,20,.09);
-  }
-  :root[data-theme="mist"]{
-    color-scheme:light;
-    --ground:#D8DEE1; --surface:#E4E9EB; --surface-2:#C9D0D3;
-    --ink:#1E2529; --muted:#5F6866; --faint:#98A19D; --hairline:#BFC7CB;
-    --primary:#2F6F5E; --primary-ink:#22574A; --on-primary:#FFFFFF; --done:#2F6F5E;
-    --partial:#A9791C; --defer:#868C97; --over:#B4482E; --wash:#E9F1EE;
-    --shadow:0 1px 2px rgba(20,30,34,.08), 0 3px 12px rgba(20,30,34,.09);
-  }
-  :root[data-theme="sage"]{
-    color-scheme:light;
-    --ground:#DCE3D5; --surface:#E6ECE0; --surface-2:#CBD4C3;
-    --ink:#1E2529; --muted:#5F6866; --faint:#98A19D; --hairline:#C1CBB8;
-    --primary:#2F6F5E; --primary-ink:#22574A; --on-primary:#FFFFFF; --done:#2F6F5E;
-    --partial:#A9791C; --defer:#868C97; --over:#B4482E; --wash:#E9F1EE;
-    --shadow:0 1px 2px rgba(22,32,22,.08), 0 3px 12px rgba(22,32,22,.09);
   }
   :root[data-theme="rosegrey"]{
     color-scheme:light;
@@ -119,35 +81,10 @@
     --partial:#A9791C; --defer:#868C97; --over:#B4482E; --wash:#E9F1EE;
     --shadow:0 1px 2px rgba(40,25,24,.08), 0 3px 12px rgba(40,25,24,.09);
   }
-  /* --- 暗い系 6種 --- */
-  :root[data-theme="slate"]{
-    color-scheme:dark;
-    --ground:#1C2024; --surface:#242930; --surface-2:#2C323A;
-    --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#333941;
-    --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
-    --partial:#D8A54A; --defer:#868C97; --over:#DB7D63; --wash:#283530;
-    --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
-  }
-  :root[data-theme="coffee"]{
-    color-scheme:dark;
-    --ground:#1E1813; --surface:#28211A; --surface-2:#322921;
-    --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#3C3226;
-    --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
-    --partial:#D8A54A; --defer:#868C97; --over:#DB7D63; --wash:#283530;
-    --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
-  }
   :root[data-theme="navy"]{
     color-scheme:dark;
     --ground:#141B24; --surface:#1C2530; --surface-2:#242F3C;
     --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#2E3A48;
-    --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
-    --partial:#D8A54A; --defer:#868C97; --over:#DB7D63; --wash:#283530;
-    --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
-  }
-  :root[data-theme="plum"]{
-    color-scheme:dark;
-    --ground:#1E1620; --surface:#281E2B; --surface-2:#322536;
-    --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#3C2E40;
     --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
     --partial:#D8A54A; --defer:#868C97; --over:#DB7D63; --wash:#283530;
     --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
@@ -1089,7 +1026,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.155";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.156";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2376,10 +2313,10 @@ const FAB = document.getElementById("fab");
 const FABM = document.getElementById("fabMenu");
 const FABTOP = document.getElementById("fabTop");
 
-/* appearance: one of light / green / dark (green = the original dark palette) */
-const THEMES = ["light","green","dark","sand","mist","sage","rosegrey","slate","coffee","navy","plum","forest","warmgrey"];
+/* appearance: v3.156で最終7択に確定（dark/light/sand/rosegrey/navy/forest/warmgrey） */
+const THEMES = ["dark","light","sand","rosegrey","navy","forest","warmgrey"];
 function applyTheme(){
-  const t = THEMES.includes(settings().theme) ? settings().theme : "green";
+  const t = THEMES.includes(settings().theme) ? settings().theme : "dark";
   document.documentElement.dataset.theme = t;
 }
 
@@ -3401,12 +3338,11 @@ function renderSettings(){
   </div>`;
 
   html += setCard("appearance", "外観", ()=>
-    `<p>背景の色。「(お試し)」は候補——緑のアクセントは変えず、背景の色味・明るさを色々試せるようにしたもの。「ライト」が見づらいという指摘への代わりの案で、良ければ後で「ライト」を削除する。</p>
+    `<p>背景の色。</p>
      <div class="seg" style="flex-wrap:wrap">
-       ${[["dark","ダーク"],["green","グリーン"],["light","ライト"],
-          ["sand","サンド(お試し)"],["mist","ミスト(お試し)"],["sage","セージ(お試し)"],["rosegrey","ローズグレー(お試し)"],
-          ["slate","スレート(お試し)"],["coffee","コーヒー(お試し)"],["navy","ネイビー(お試し)"],["plum","プラム(お試し)"],["forest","フォレスト(お試し)"],["warmgrey","ウォームグレー(お試し)"]].map(([v,l])=>
-         `<button class="${(THEMES.includes(settings().theme)?settings().theme:"green")===v?"on":""}" data-act="set-theme" data-v="${v}">${l}</button>`).join("")}
+       ${[["dark","ダーク"],["light","ライト"],["sand","サンド"],["rosegrey","ローズグレー"],
+          ["navy","ネイビー"],["forest","フォレスト"],["warmgrey","ウォームグレー"]].map(([v,l])=>
+         `<button class="${(THEMES.includes(settings().theme)?settings().theme:"dark")===v?"on":""}" data-act="set-theme" data-v="${v}">${l}</button>`).join("")}
      </div>`);
 
   html += setCard("outlook", "今日の見通し", ()=>
