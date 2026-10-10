@@ -81,118 +81,92 @@
     --wash:#182420;
     --shadow:0 1px 2px rgba(0,0,0,.40), 0 3px 14px rgba(0,0,0,.46);
   }
-  /* v3.153お試し(やり直し): 前回(v3.152)はアクセントの緑まで変えて
-     しまっていたが、指摘により方針を修正——緑を使っている部分は
-     「green」テーマと同じ値のまま変えず、背景だけを「真っ白」「真っ黒」
-     ではない中間的な明るさにした候補に作り直す。
-     候補その1: 明るい方——真っ白(#FFFFFF)のまぶしさを抑えた、ごく薄い
-     グレー寄りの背景。文字は黒系（lightと同じ）。緑はlightと同じ値。 */
-  :root[data-theme="softlight"]{
+  /* v3.155お試し(全クリアしてやり直し): 前回(v3.152-154)は結局「白黒の
+     明るさを変えただけ」という指摘のため、お試し候補を全部消して作り直す。
+     今回は背景に実際に色味（暖色/冷色/緑み寄りなど）の違う系統を10種類
+     混ぜる。緑のアクセント(primary/done等)は、明るい系はlightと、暗い系
+     はgreen/darkと完全に同じ値を使う（引き続きそこは変えない）。 */
+  /* --- 明るい系 4種 --- */
+  :root[data-theme="sand"]{
     color-scheme:light;
-    --ground:#EDEDE8;
-    --surface:#F5F5F0;
-    --surface-2:#E6E6DF;
-    --ink:#242A26;
-    --muted:#5F6866;
-    --faint:#98A19D;
-    --hairline:#D8D8D0;
-    --primary:#2F6F5E;
-    --primary-ink:#22574A;
-    --on-primary:#FFFFFF;
-    --done:#2F6F5E;
-    --partial:#A9791C;
-    --defer:#868C97;
-    --over:#B4482E;
-    --wash:#E9F1EE;
-    --shadow:0 1px 2px rgba(22,32,29,.06), 0 3px 12px rgba(22,32,29,.07);
+    --ground:#E8E0CC; --surface:#F0E9D8; --surface-2:#DED5BE;
+    --ink:#1E2529; --muted:#5F6866; --faint:#98A19D; --hairline:#D2C9AE;
+    --primary:#2F6F5E; --primary-ink:#22574A; --on-primary:#FFFFFF; --done:#2F6F5E;
+    --partial:#A9791C; --defer:#868C97; --over:#B4482E; --wash:#E9F1EE;
+    --shadow:0 1px 2px rgba(40,35,20,.08), 0 3px 12px rgba(40,35,20,.09);
   }
-  /* 候補その2: 暗い方——「dark」の真っ黒より少し明るいグレー。文字も
-     他の暗いテーマよりやや明るめにして、画面の明るさを落とした状態でも
-     読みやすさを保う狙い。緑は「green」テーマと同じ値。 */
-  :root[data-theme="softdark"]{
-    color-scheme:dark;
-    --ground:#23262A;
-    --surface:#2C2F33;
-    --surface-2:#35383D;
-    --ink:#E7EAE4;
-    --muted:#9AA39E;
-    --faint:#6C766F;
-    --hairline:#3C3F43;
-    --primary:#5FB79E;
-    --primary-ink:#8CD0BC;
-    --on-primary:#0E1513;
-    --done:#5FB79E;
-    --partial:#D8A54A;
-    --defer:#868C97;
-    --over:#DB7D63;
-    --wash:#283530;
-    --shadow:0 1px 2px rgba(0,0,0,.32), 0 3px 14px rgba(0,0,0,.36);
-  }
-  /* v3.154お試し: 既存5つ(light/green/dark/softlight/softdark)は保留の
-     まま、さらに3つ追加。緑(primary/done等)は変えず、light側かgreen/dark
-     側のどちらかと完全に同じ値を使い、背景の明るさだけ変える方針を継続。 */
-  /* 候補その3: softlightよりさらに一段暗い（まぶしさを抑えた）明るい
-     グレー。緑はlightと同じ。 */
-  :root[data-theme="lightgrey"]{
+  :root[data-theme="mist"]{
     color-scheme:light;
-    --ground:#D7D8D2;
-    --surface:#E1E2DC;
-    --surface-2:#C9CAC3;
-    --ink:#1E2529;
-    --muted:#5F6866;
-    --faint:#98A19D;
-    --hairline:#C0C1B9;
-    --primary:#2F6F5E;
-    --primary-ink:#22574A;
-    --on-primary:#FFFFFF;
-    --done:#2F6F5E;
-    --partial:#A9791C;
-    --defer:#868C97;
-    --over:#B4482E;
-    --wash:#E9F1EE;
-    --shadow:0 1px 2px rgba(22,32,29,.08), 0 3px 12px rgba(22,32,29,.09);
+    --ground:#D8DEE1; --surface:#E4E9EB; --surface-2:#C9D0D3;
+    --ink:#1E2529; --muted:#5F6866; --faint:#98A19D; --hairline:#BFC7CB;
+    --primary:#2F6F5E; --primary-ink:#22574A; --on-primary:#FFFFFF; --done:#2F6F5E;
+    --partial:#A9791C; --defer:#868C97; --over:#B4482E; --wash:#E9F1EE;
+    --shadow:0 1px 2px rgba(20,30,34,.08), 0 3px 12px rgba(20,30,34,.09);
   }
-  /* 候補その4: softdarkより一段暗い、暖色の濃いチャコール（darkの真っ黒
-     とsoftdarkの中間）。緑はgreen/darkと同じ。 */
-  :root[data-theme="charcoal"]{
+  :root[data-theme="sage"]{
+    color-scheme:light;
+    --ground:#DCE3D5; --surface:#E6ECE0; --surface-2:#CBD4C3;
+    --ink:#1E2529; --muted:#5F6866; --faint:#98A19D; --hairline:#C1CBB8;
+    --primary:#2F6F5E; --primary-ink:#22574A; --on-primary:#FFFFFF; --done:#2F6F5E;
+    --partial:#A9791C; --defer:#868C97; --over:#B4482E; --wash:#E9F1EE;
+    --shadow:0 1px 2px rgba(22,32,22,.08), 0 3px 12px rgba(22,32,22,.09);
+  }
+  :root[data-theme="rosegrey"]{
+    color-scheme:light;
+    --ground:#E6D9D8; --surface:#EFE4E3; --surface-2:#D6C7C6;
+    --ink:#1E2529; --muted:#5F6866; --faint:#98A19D; --hairline:#CBB9B8;
+    --primary:#2F6F5E; --primary-ink:#22574A; --on-primary:#FFFFFF; --done:#2F6F5E;
+    --partial:#A9791C; --defer:#868C97; --over:#B4482E; --wash:#E9F1EE;
+    --shadow:0 1px 2px rgba(40,25,24,.08), 0 3px 12px rgba(40,25,24,.09);
+  }
+  /* --- 暗い系 6種 --- */
+  :root[data-theme="slate"]{
     color-scheme:dark;
-    --ground:#161718;
-    --surface:#1E2021;
-    --surface-2:#272829;
-    --ink:#E7EAE4;
-    --muted:#9AA39E;
-    --faint:#6C766F;
-    --hairline:#303133;
-    --primary:#5FB79E;
-    --primary-ink:#8CD0BC;
-    --on-primary:#0E1513;
-    --done:#5FB79E;
-    --partial:#D8A54A;
-    --defer:#868C97;
-    --over:#DB7D63;
-    --wash:#1C2622;
+    --ground:#1C2024; --surface:#242930; --surface-2:#2C323A;
+    --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#333941;
+    --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
+    --partial:#D8A54A; --defer:#868C97; --over:#DB7D63; --wash:#283530;
     --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
   }
-  /* 候補その5: 「明るい」「暗い」のどちらでもない、中間くらいの明るさの
-     グレー。文字は白系（暗い側に近いので）、緑はgreen/darkと同じ。 */
-  :root[data-theme="midgrey"]{
+  :root[data-theme="coffee"]{
     color-scheme:dark;
-    --ground:#4B4D49;
-    --surface:#555750;
-    --surface-2:#606259;
-    --ink:#F1F1EC;
-    --muted:#C9CAC3;
-    --faint:#9A9B94;
-    --hairline:#6A6C64;
-    --primary:#5FB79E;
-    --primary-ink:#8CD0BC;
-    --on-primary:#13211C;
-    --done:#5FB79E;
-    --partial:#D8A54A;
-    --defer:#D0D1CB;
-    --over:#DB7D63;
-    --wash:#3A4A42;
-    --shadow:0 1px 2px rgba(0,0,0,.22), 0 3px 12px rgba(0,0,0,.25);
+    --ground:#1E1813; --surface:#28211A; --surface-2:#322921;
+    --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#3C3226;
+    --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
+    --partial:#D8A54A; --defer:#868C97; --over:#DB7D63; --wash:#283530;
+    --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
+  }
+  :root[data-theme="navy"]{
+    color-scheme:dark;
+    --ground:#141B24; --surface:#1C2530; --surface-2:#242F3C;
+    --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#2E3A48;
+    --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
+    --partial:#D8A54A; --defer:#868C97; --over:#DB7D63; --wash:#283530;
+    --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
+  }
+  :root[data-theme="plum"]{
+    color-scheme:dark;
+    --ground:#1E1620; --surface:#281E2B; --surface-2:#322536;
+    --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#3C2E40;
+    --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
+    --partial:#D8A54A; --defer:#868C97; --over:#DB7D63; --wash:#283530;
+    --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
+  }
+  :root[data-theme="forest"]{
+    color-scheme:dark;
+    --ground:#171D1A; --surface:#202723; --surface-2:#29312C;
+    --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#333C35;
+    --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
+    --partial:#D8A54A; --defer:#868C97; --over:#DB7D63; --wash:#283530;
+    --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
+  }
+  :root[data-theme="warmgrey"]{
+    color-scheme:dark;
+    --ground:#1E1C1A; --surface:#282624; --surface-2:#322F2C;
+    --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#3C3835;
+    --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
+    --partial:#D8A54A; --defer:#868C97; --over:#DB7D63; --wash:#283530;
+    --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
   }
 
   *{box-sizing:border-box}
@@ -1115,7 +1089,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.154";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.155";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2403,7 +2377,7 @@ const FABM = document.getElementById("fabMenu");
 const FABTOP = document.getElementById("fabTop");
 
 /* appearance: one of light / green / dark (green = the original dark palette) */
-const THEMES = ["light","green","dark","softlight","softdark","lightgrey","charcoal","midgrey"];
+const THEMES = ["light","green","dark","sand","mist","sage","rosegrey","slate","coffee","navy","plum","forest","warmgrey"];
 function applyTheme(){
   const t = THEMES.includes(settings().theme) ? settings().theme : "green";
   document.documentElement.dataset.theme = t;
@@ -3427,11 +3401,11 @@ function renderSettings(){
   </div>`;
 
   html += setCard("appearance", "外観", ()=>
-    `<p>背景の色。「(お試し)」は候補——どれも緑のアクセントは変えず、背景の明るさだけを真っ白／真っ黒から少しずらしたもの。「ライト」が見づらいという指摘への代わりの案で、良ければ後で「ライト」を削除する。</p>
+    `<p>背景の色。「(お試し)」は候補——緑のアクセントは変えず、背景の色味・明るさを色々試せるようにしたもの。「ライト」が見づらいという指摘への代わりの案で、良ければ後で「ライト」を削除する。</p>
      <div class="seg" style="flex-wrap:wrap">
        ${[["dark","ダーク"],["green","グリーン"],["light","ライト"],
-          ["softlight","ソフトライト(お試し)"],["softdark","ソフトダーク(お試し)"],
-          ["lightgrey","ライトグレー(お試し)"],["charcoal","チャコール(お試し)"],["midgrey","ミッドグレー(お試し)"]].map(([v,l])=>
+          ["sand","サンド(お試し)"],["mist","ミスト(お試し)"],["sage","セージ(お試し)"],["rosegrey","ローズグレー(お試し)"],
+          ["slate","スレート(お試し)"],["coffee","コーヒー(お試し)"],["navy","ネイビー(お試し)"],["plum","プラム(お試し)"],["forest","フォレスト(お試し)"],["warmgrey","ウォームグレー(お試し)"]].map(([v,l])=>
          `<button class="${(THEMES.includes(settings().theme)?settings().theme:"green")===v?"on":""}" data-act="set-theme" data-v="${v}">${l}</button>`).join("")}
      </div>`);
 
