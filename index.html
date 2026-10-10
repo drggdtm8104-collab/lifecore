@@ -81,6 +81,51 @@
     --wash:#182420;
     --shadow:0 1px 2px rgba(0,0,0,.40), 0 3px 14px rgba(0,0,0,.46);
   }
+  /* v3.152お試し: 「ライト」が明るすぎて見づらいとの指摘への候補その1。
+     真っ白ではなく、暗い場所でも低めの明るさのまま読める温かみのある
+     セピア（クリーム色）系。アクセントは緑ではなく落ち着いたオリーブ。 */
+  :root[data-theme="sepia"]{
+    color-scheme:light;
+    --ground:#E4DCC8;
+    --surface:#ECE4D0;
+    --surface-2:#DED5BE;
+    --ink:#2E2A20;
+    --muted:#6B6355;
+    --faint:#9C9480;
+    --hairline:#CFC5AA;
+    --primary:#5E7A52;
+    --primary-ink:#48603E;
+    --on-primary:#F5F2E6;
+    --done:#5E7A52;
+    --partial:#A9791C;
+    --defer:#8A8370;
+    --over:#A3482E;
+    --wash:#DCE3D1;
+    --shadow:0 1px 2px rgba(40,35,20,.10), 0 3px 12px rgba(40,35,20,.12);
+  }
+  /* v3.152お試し: 候補その2。「dark」(真っ黒)・「green」(緑み)とは違う、
+     暖色グレーの暗い画面。文字色を他の暗いテーマよりやや明るめにして、
+     明るさを落とした状態でも読みやすさを保つことを狙う。アクセントは
+     琥珀色。 */
+  :root[data-theme="dim"]{
+    color-scheme:dark;
+    --ground:#1C1D1F;
+    --surface:#262729;
+    --surface-2:#303234;
+    --ink:#F2F1EE;
+    --muted:#B4B2AC;
+    --faint:#817F78;
+    --hairline:#3A3B3D;
+    --primary:#E8B65A;
+    --primary-ink:#F3CD86;
+    --on-primary:#1C1508;
+    --done:#E8B65A;
+    --partial:#D8A54A;
+    --defer:#9B988F;
+    --over:#DB7D63;
+    --wash:#332C1C;
+    --shadow:0 1px 2px rgba(0,0,0,.35), 0 3px 14px rgba(0,0,0,.40);
+  }
 
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
@@ -963,7 +1008,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.151";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.152";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2249,8 +2294,9 @@ const FABM = document.getElementById("fabMenu");
 const FABTOP = document.getElementById("fabTop");
 
 /* appearance: one of light / green / dark (green = the original dark palette) */
+const THEMES = ["light","green","dark","sepia","dim"];
 function applyTheme(){
-  const t = ["light","green","dark"].includes(settings().theme) ? settings().theme : "green";
+  const t = THEMES.includes(settings().theme) ? settings().theme : "green";
   document.documentElement.dataset.theme = t;
 }
 
@@ -3268,10 +3314,10 @@ function renderSettings(){
   </div>`;
 
   html += setCard("appearance", "外観", ()=>
-    `<p>背景の色。</p>
-     <div class="seg">
-       ${[["dark","ダーク"],["green","グリーン"],["light","ライト"]].map(([v,l])=>
-         `<button class="${(["light","green","dark"].includes(settings().theme)?settings().theme:"green")===v?"on":""}" data-act="set-theme" data-v="${v}">${l}</button>`).join("")}
+    `<p>背景の色。「セピア」「ディム」はお試し候補——「ライト」が見づらいという指摘への代わりの案で、良ければ後で「ライト」を削除する。</p>
+     <div class="seg" style="flex-wrap:wrap">
+       ${[["dark","ダーク"],["green","グリーン"],["light","ライト"],["sepia","セピア(お試し)"],["dim","ディム(お試し)"]].map(([v,l])=>
+         `<button class="${(THEMES.includes(settings().theme)?settings().theme:"green")===v?"on":""}" data-act="set-theme" data-v="${v}">${l}</button>`).join("")}
      </div>`);
 
   html += setCard("outlook", "今日の見通し", ()=>
