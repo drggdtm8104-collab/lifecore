@@ -81,50 +81,52 @@
     --wash:#182420;
     --shadow:0 1px 2px rgba(0,0,0,.40), 0 3px 14px rgba(0,0,0,.46);
   }
-  /* v3.152お試し: 「ライト」が明るすぎて見づらいとの指摘への候補その1。
-     真っ白ではなく、暗い場所でも低めの明るさのまま読める温かみのある
-     セピア（クリーム色）系。アクセントは緑ではなく落ち着いたオリーブ。 */
-  :root[data-theme="sepia"]{
+  /* v3.153お試し(やり直し): 前回(v3.152)はアクセントの緑まで変えて
+     しまっていたが、指摘により方針を修正——緑を使っている部分は
+     「green」テーマと同じ値のまま変えず、背景だけを「真っ白」「真っ黒」
+     ではない中間的な明るさにした候補に作り直す。
+     候補その1: 明るい方——真っ白(#FFFFFF)のまぶしさを抑えた、ごく薄い
+     グレー寄りの背景。文字は黒系（lightと同じ）。緑はlightと同じ値。 */
+  :root[data-theme="softlight"]{
     color-scheme:light;
-    --ground:#E4DCC8;
-    --surface:#ECE4D0;
-    --surface-2:#DED5BE;
-    --ink:#2E2A20;
-    --muted:#6B6355;
-    --faint:#9C9480;
-    --hairline:#CFC5AA;
-    --primary:#5E7A52;
-    --primary-ink:#48603E;
-    --on-primary:#F5F2E6;
-    --done:#5E7A52;
+    --ground:#EDEDE8;
+    --surface:#F5F5F0;
+    --surface-2:#E6E6DF;
+    --ink:#242A26;
+    --muted:#5F6866;
+    --faint:#98A19D;
+    --hairline:#D8D8D0;
+    --primary:#2F6F5E;
+    --primary-ink:#22574A;
+    --on-primary:#FFFFFF;
+    --done:#2F6F5E;
     --partial:#A9791C;
-    --defer:#8A8370;
-    --over:#A3482E;
-    --wash:#DCE3D1;
-    --shadow:0 1px 2px rgba(40,35,20,.10), 0 3px 12px rgba(40,35,20,.12);
+    --defer:#868C97;
+    --over:#B4482E;
+    --wash:#E9F1EE;
+    --shadow:0 1px 2px rgba(22,32,29,.06), 0 3px 12px rgba(22,32,29,.07);
   }
-  /* v3.152お試し: 候補その2。「dark」(真っ黒)・「green」(緑み)とは違う、
-     暖色グレーの暗い画面。文字色を他の暗いテーマよりやや明るめにして、
-     明るさを落とした状態でも読みやすさを保つことを狙う。アクセントは
-     琥珀色。 */
-  :root[data-theme="dim"]{
+  /* 候補その2: 暗い方——「dark」の真っ黒より少し明るいグレー。文字も
+     他の暗いテーマよりやや明るめにして、画面の明るさを落とした状態でも
+     読みやすさを保う狙い。緑は「green」テーマと同じ値。 */
+  :root[data-theme="softdark"]{
     color-scheme:dark;
-    --ground:#1C1D1F;
-    --surface:#262729;
-    --surface-2:#303234;
-    --ink:#F2F1EE;
-    --muted:#B4B2AC;
-    --faint:#817F78;
-    --hairline:#3A3B3D;
-    --primary:#E8B65A;
-    --primary-ink:#F3CD86;
-    --on-primary:#1C1508;
-    --done:#E8B65A;
+    --ground:#23262A;
+    --surface:#2C2F33;
+    --surface-2:#35383D;
+    --ink:#E7EAE4;
+    --muted:#9AA39E;
+    --faint:#6C766F;
+    --hairline:#3C3F43;
+    --primary:#5FB79E;
+    --primary-ink:#8CD0BC;
+    --on-primary:#0E1513;
+    --done:#5FB79E;
     --partial:#D8A54A;
-    --defer:#9B988F;
+    --defer:#868C97;
     --over:#DB7D63;
-    --wash:#332C1C;
-    --shadow:0 1px 2px rgba(0,0,0,.35), 0 3px 14px rgba(0,0,0,.40);
+    --wash:#283530;
+    --shadow:0 1px 2px rgba(0,0,0,.32), 0 3px 14px rgba(0,0,0,.36);
   }
 
   *{box-sizing:border-box}
@@ -891,13 +893,32 @@
     border-radius:9px;background:var(--surface);font-family:var(--font-body);
     line-height:1.55;resize:vertical;
   }
-  /* v3.151: メモ欄を拡大/縮小するボタン。textarea右上に重ねる。 */
+  /* v3.151: メモ欄をポップアウトで大きく編集するボタン。textarea右上に
+     重ねる。v3.153: 枠内で高さをトグルするだけだったのを、別画面で
+     大きく見られるポップアウト方式に変更、文字ラベルもマークに変更。 */
   .note-wrap{position:relative}
-  textarea.fld-note.expanded{min-height:260px}
   .note-expand-btn{
     position:absolute;top:6px;right:6px;z-index:1;
-    font-size:10.5px;color:var(--muted);background:var(--surface-2);
-    border:1px solid var(--hairline);border-radius:6px;padding:2px 7px;cursor:pointer;
+    width:24px;height:24px;display:grid;place-items:center;
+    color:var(--muted);background:var(--surface-2);
+    border:1px solid var(--hairline);border-radius:6px;padding:0;cursor:pointer;
+  }
+  .note-expand-btn svg{width:14px;height:14px}
+  /* メモのポップアウト編集画面。シート(z-index:50)より上に重ねる。 */
+  .note-popout{
+    position:fixed;inset:0;z-index:60;background:var(--surface);
+    display:flex;flex-direction:column;padding:14px;padding-top:calc(14px + env(safe-area-inset-top,0));
+  }
+  .note-popout[hidden]{display:none}
+  .note-popout-head{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:10px;flex:none;
+  }
+  .note-popout-head span{font-weight:600;font-size:14px}
+  .note-popout textarea{
+    flex:1;width:100%;resize:none;padding:12px;border:1px solid var(--hairline);
+    border-radius:11px;background:var(--surface);color:var(--ink);
+    font-family:var(--font-body);font-size:16px;line-height:1.65;
   }
 
   /* generic form controls */
@@ -996,6 +1017,13 @@
   <div class="sheet-bg" data-act="close-sheet"></div>
   <div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
 </div>
+<div class="note-popout" id="notePopout" hidden role="dialog" aria-modal="true">
+  <div class="note-popout-head">
+    <span>メモ</span>
+    <button type="button" class="btn ghost tiny" data-act="close-note-popout">閉じる</button>
+  </div>
+  <textarea id="notePopoutArea"></textarea>
+</div>
 
 <script>
 "use strict";
@@ -1008,7 +1036,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.152";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.153";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1044,15 +1072,17 @@ const uid = () => (crypto.randomUUID ? crypto.randomUUID().slice(0,8) : Math.ran
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 // v3.151: メモ欄（.fld-note）が狭くて長文を書きづらいという指摘への対応。
 // textarea.resize:verticalは既にあったが、ドラッグでのリサイズはスマホだと
-// つまみが小さく操作しづらいため、タップで一気に拡大/縮小できるボタンを
-// textarea右上に重ねて出す（データとは無関係な表示上のトグルなので、
-// case "toggle-note-expand" はsave()/render()を呼ばない——呼ぶと未保存の
-// 入力中テキストが消えてしまう）。6箇所ある.fld-noteの定義をこの共通
-// ヘルパーに統一。
+// つまみが小さく操作しづらいため、タップで大きく編集できるボタンを
+// textarea右上に重ねて出す。v3.153: 当初は枠内で高さをトグルするだけ
+// だったが、指摘によりポップアウト別画面(#notePopout)で編集する方式に
+// 変更、ボタンの文字ラベルもマーク(NOTE_EXPAND_ICON)に変更。
+// case "open-note-popout"/"close-note-popout" はsave()/render()を呼ばない
+// ——呼ぶと未保存の入力中テキストが消えてしまう。6箇所ある.fld-noteの
+// 定義をこの共通ヘルパーに統一。
 function noteTextarea(id, value, placeholder, extraAttrs){
   return `<div class="note-wrap">
     <textarea id="${id}" class="fld-note" placeholder="${esc(placeholder)}"${extraAttrs||""}>${esc(value||"")}</textarea>
-    <button type="button" class="note-expand-btn" data-act="toggle-note-expand" data-id="${id}">拡大</button>
+    <button type="button" class="note-expand-btn" data-act="open-note-popout" data-id="${id}" aria-label="大きく表示して編集">${NOTE_EXPAND_ICON}</button>
   </div>`;
 }
 const pad = n => String(n).padStart(2,"0");
@@ -1147,7 +1177,7 @@ const CONTAMINATED_TASK_IDS = new Set([
   "07858496","24446b30","5602f258","b269b4a8","7ffaf36e","06df156f","c9221e46","a94c6bc0","2acda6e8",
 ]);
 let db = loadLocal();
-let state = { tab:"today", todayView:"timeline", tplView:"timeline", tasksView:"single", taskSort:"default", pickView:"single", pickSort:"default", noteId:null, date: todayStr(), histSpan:"day", histDate: todayStr(), histView:"records", settingsTplId:null, _setOpen:new Set(), _noteOpen:new Set(), _tplDraft:null, _highlightOccId:null };
+let state = { tab:"today", todayView:"timeline", tplView:"timeline", tasksView:"single", taskSort:"default", pickView:"single", pickSort:"default", noteId:null, date: todayStr(), histSpan:"day", histDate: todayStr(), histView:"records", settingsTplId:null, _setOpen:new Set(), _noteOpen:new Set(), _tplDraft:null, _highlightOccId:null, _notePopoutId:null };
 
 let DB = null;                // Artifact DB namespace, or null (offline / not on claude.ai)
 let dbReady = false;
@@ -2294,7 +2324,7 @@ const FABM = document.getElementById("fabMenu");
 const FABTOP = document.getElementById("fabTop");
 
 /* appearance: one of light / green / dark (green = the original dark palette) */
-const THEMES = ["light","green","dark","sepia","dim"];
+const THEMES = ["light","green","dark","softlight","softdark"];
 function applyTheme(){
   const t = THEMES.includes(settings().theme) ? settings().theme : "green";
   document.documentElement.dataset.theme = t;
@@ -2357,6 +2387,10 @@ const GEAR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 /* スケジュール日付欄の「テンプレート作成」ショートカット用アイコン（today アイコンの
    カレンダーに + を入れたもの＝「予定の型を追加」を連想させる） */
 const TPL_ADD_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/><path d="M12 12.5v5M9.5 15h5"/></svg>`;
+/* v3.153: メモ欄を大きいポップアウト画面で編集するためのボタン用アイコン
+   （四隅のカギ括弧＝「拡大して表示」の意味。v3.151では文字で「拡大」と
+   出していたが、指摘によりマークに変更） */
+const NOTE_EXPAND_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"/></svg>`;
 
 function renderHeader(){
   if(state.tab==="today"){
@@ -3314,9 +3348,9 @@ function renderSettings(){
   </div>`;
 
   html += setCard("appearance", "外観", ()=>
-    `<p>背景の色。「セピア」「ディム」はお試し候補——「ライト」が見づらいという指摘への代わりの案で、良ければ後で「ライト」を削除する。</p>
+    `<p>背景の色。「ソフトライト」「ソフトダーク」はお試し候補——緑のアクセントは変えず、背景の明るさだけを真っ白／真っ黒から少しずらしたもの。「ライト」が見づらいという指摘への代わりの案で、良ければ後で「ライト」を削除する。</p>
      <div class="seg" style="flex-wrap:wrap">
-       ${[["dark","ダーク"],["green","グリーン"],["light","ライト"],["sepia","セピア(お試し)"],["dim","ディム(お試し)"]].map(([v,l])=>
+       ${[["dark","ダーク"],["green","グリーン"],["light","ライト"],["softlight","ソフトライト(お試し)"],["softdark","ソフトダーク(お試し)"]].map(([v,l])=>
          `<button class="${(THEMES.includes(settings().theme)?settings().theme:"green")===v?"on":""}" data-act="set-theme" data-v="${v}">${l}</button>`).join("")}
      </div>`);
 
@@ -3996,14 +4030,24 @@ document.addEventListener("click", e=>{
     case "edit-day": state.tab = "today"; state.date = v; render(); M.scrollTop = 0; break;
     case "go-settings": state.tab="settings"; render(); M.scrollTop=0; break;
     case "scroll-top": M.scrollTop = 0; break;
-    // v3.151: メモ欄の拡大/縮小トグル。表示上の見た目だけの操作なので
-    // save()/render()は呼ばない——呼ぶと入力中の未保存テキストが消えてしまう。
-    case "toggle-note-expand": {
-      const ta = document.getElementById(id);
-      if(!ta) break;
-      const expanding = !ta.classList.contains("expanded");
-      ta.classList.toggle("expanded", expanding);
-      el.textContent = expanding ? "縮小" : "拡大";
+    // v3.153: メモ欄のポップアウト編集。同じtextareaの中身を大きい画面
+    // （#notePopout）へコピーして表示し、閉じるときに書き戻す。表示上の
+    // 操作だけなのでsave()/render()は呼ばない——呼ぶと入力中の未保存
+    // テキストが消えてしまう。どのtextareaへ書き戻すかをstate._notePopoutId
+    // に覚えておく。
+    case "open-note-popout": {
+      const src = document.getElementById(id);
+      if(!src) break;
+      state._notePopoutId = id;
+      document.getElementById("notePopoutArea").value = src.value;
+      document.getElementById("notePopout").hidden = false;
+      break;
+    }
+    case "close-note-popout": {
+      const src = state._notePopoutId ? document.getElementById(state._notePopoutId) : null;
+      if(src) src.value = document.getElementById("notePopoutArea").value;
+      state._notePopoutId = null;
+      document.getElementById("notePopout").hidden = true;
       break;
     }
     case "go-tpl-edit": {

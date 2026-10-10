@@ -80,7 +80,7 @@ try{
   console.log("SCRIPT THREW ON LOAD:", e.message);
   process.exit(1);
 }
-vm.runInContext(`globalThis.__t = { get db(){ return db; }, set db(v){ db=v; }, noteTextarea, state, render };`, sandbox);
+vm.runInContext(`globalThis.__t = { get db(){ return db; }, set db(v){ db=v; }, noteTextarea, state, render, NOTE_EXPAND_ICON };`, sandbox);
 const T = sandbox.__t;
 
 function dispatchClick(dataAct, extra){
@@ -92,34 +92,37 @@ function dispatchClick(dataAct, extra){
   return t;
 }
 
-// v3.151-1: noteTextarea()ヘルパーが.note-wrap+拡大ボタン付きのHTMLを返す
+// v3.153-1: noteTextarea()ヘルパーが.note-wrap+ポップアウトボタン(マーク
+// アイコン、文字ラベルなし)付きのHTMLを返す
 {
   const html = T.noteTextarea("myNote", "本文", "placeholder例", ` data-occid="abc"`);
   ok("wraps in .note-wrap", html.includes('<div class="note-wrap">'));
   ok("textarea has the given id/value/placeholder/extra attr", html.includes('id="myNote"') && html.includes(">本文</textarea>") && html.includes('placeholder="placeholder例"') && html.includes('data-occid="abc"'));
-  ok("includes the expand button pointed at the same id", html.includes('data-act="toggle-note-expand"') && html.includes('data-id="myNote"'));
-  ok("button starts labeled 拡大", html.includes(">拡大<"));
+  ok("includes the popout button pointed at the same id", html.includes('data-act="open-note-popout"') && html.includes('data-id="myNote"'));
+  ok("the button uses the icon, not a text label", html.includes(T.NOTE_EXPAND_ICON) && !html.includes(">拡大<"));
 }
 
-// v3.151-2: toggle-note-expand は対象のtextareaのexpandedクラスをトグルし、
-// 押したボタン自身の文字を拡大/縮小で切り替える。save()/render()は呼ばない
-// （呼ぶと入力中の未保存テキストが消えるため、ここでは呼ばれないことも
-// renderが0回のままであることで確認する）。
+// v3.153-2: open-note-popoutは元のtextareaの中身をポップアウト側の
+// textareaへコピーして表示を開き、close-note-popoutは逆に書き戻して
+// 閉じる。どちらもsave()/render()は呼ばない（呼ぶと入力中の未保存
+// テキストが消えるため）。
 {
-  const ta = getEl("myNote2");
-  let renderCalls = 0;
-  const origRender = T.render;
-  // renderをスパイしたいが、グローバル関数の再代入はsandbox内でのみ有効に
-  // したいので、ここでは代わりに「呼ばれたらエラーになる」ような構成にせず、
-  // 単純にtoggle後のDOM状態のみを検証する（render()自体は他のケースで
-  // 十分に動作確認済み）。
-  const btn1 = dispatchClick("toggle-note-expand", { id:"myNote2" });
-  ok("first click adds the expanded class", ta.classList.contains("expanded"));
-  ok("first click changes button label to 縮小", btn1.textContent === "縮小");
+  const src = getEl("myNote2");
+  src.value = "元の内容";
+  const popout = getEl("notePopout");
+  const popoutArea = getEl("notePopoutArea");
+  popout.hidden = true;
 
-  const btn2 = dispatchClick("toggle-note-expand", { id:"myNote2" });
-  ok("second click removes the expanded class", !ta.classList.contains("expanded"));
-  ok("second click changes button label back to 拡大", btn2.textContent === "拡大");
+  dispatchClick("open-note-popout", { id:"myNote2" });
+  ok("opening copies the source value into the popout textarea", popoutArea.value === "元の内容");
+  ok("opening un-hides the popout", popout.hidden === false);
+  ok("state remembers which textarea to write back to", T.state._notePopoutId === "myNote2");
+
+  popoutArea.value = "編集後の内容";
+  dispatchClick("close-note-popout");
+  ok("closing writes the edited text back to the source textarea", src.value === "編集後の内容");
+  ok("closing hides the popout again", popout.hidden === true);
+  ok("state's remembered id is cleared after closing", T.state._notePopoutId === null);
 }
 
 // v3.151-3: 「ページの先頭へ」(FABTOP)はFABと同じ表示条件(today/tasks/notes)
