@@ -453,6 +453,15 @@
      にしても見た目には何も起きず、メニューが画面に残り続ける不具合の原因。
      hidden指定時だけ確実にdisplay:noneで上書きする。 */
   .fab[hidden], .fab-menu[hidden]{ display:none; }
+  /* v3.151: 「ページの先頭へ」を、使いづらかったヘッダー右上から
+     ＋ボタンの真上（FABと同じ右端、fab-menuと同じ高さ）に移動した。
+     ＋ボタンを開いたときに出る項目が上に重なるのは問題ない（＋ボタンを
+     閉じている時にしか上移動は使わないため）。.icon-btnもdisplay:grid
+     なので、.fab同様に[hidden]を明示的に上書きする必要がある。 */
+  .fab-top{
+    position:absolute;right:14px;bottom:calc(120px + env(safe-area-inset-bottom,0));z-index:29;
+  }
+  .fab-top[hidden]{ display:none; }
   .fab-menu button{
     background:var(--surface);border:1px solid var(--hairline);
     border-radius:10px;padding:9px 12px;font-size:12.5px;font-weight:500;
@@ -837,6 +846,14 @@
     border-radius:9px;background:var(--surface);font-family:var(--font-body);
     line-height:1.55;resize:vertical;
   }
+  /* v3.151: メモ欄を拡大/縮小するボタン。textarea右上に重ねる。 */
+  .note-wrap{position:relative}
+  textarea.fld-note.expanded{min-height:260px}
+  .note-expand-btn{
+    position:absolute;top:6px;right:6px;z-index:1;
+    font-size:10.5px;color:var(--muted);background:var(--surface-2);
+    border:1px solid var(--hairline);border-radius:6px;padding:2px 7px;cursor:pointer;
+  }
 
   /* generic form controls */
   input[type="text"],input[type="number"],input[type="time"],select{
@@ -924,6 +941,9 @@
   <button class="fab" id="fab" hidden aria-label="追加">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
   </button>
+  <button class="icon-btn fab-top" id="fabTop" hidden aria-label="ページの先頭へ" data-act="scroll-top">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5h14"/><path d="M12 20V9M6.5 13.5 12 8l5.5 5.5"/></svg>
+  </button>
   <div class="fab-menu" id="fabMenu" hidden></div>
   <div id="toast" hidden></div>
 </div>
@@ -943,7 +963,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.150";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.151";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -977,6 +997,19 @@ const CATS = ["生活","勉強","運動","家事","食事","趣味","仕事","�
 /* ---------- utils ---------- */
 const uid = () => (crypto.randomUUID ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10));
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// v3.151: メモ欄（.fld-note）が狭くて長文を書きづらいという指摘への対応。
+// textarea.resize:verticalは既にあったが、ドラッグでのリサイズはスマホだと
+// つまみが小さく操作しづらいため、タップで一気に拡大/縮小できるボタンを
+// textarea右上に重ねて出す（データとは無関係な表示上のトグルなので、
+// case "toggle-note-expand" はsave()/render()を呼ばない——呼ぶと未保存の
+// 入力中テキストが消えてしまう）。6箇所ある.fld-noteの定義をこの共通
+// ヘルパーに統一。
+function noteTextarea(id, value, placeholder, extraAttrs){
+  return `<div class="note-wrap">
+    <textarea id="${id}" class="fld-note" placeholder="${esc(placeholder)}"${extraAttrs||""}>${esc(value||"")}</textarea>
+    <button type="button" class="note-expand-btn" data-act="toggle-note-expand" data-id="${id}">拡大</button>
+  </div>`;
+}
 const pad = n => String(n).padStart(2,"0");
 const dstr = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const parseDstr = s => { const [y,m,dd]=s.split("-").map(Number); return new Date(y,m-1,dd); };
@@ -2213,6 +2246,7 @@ const H = document.getElementById("header");
 const M = document.getElementById("main");
 const FAB = document.getElementById("fab");
 const FABM = document.getElementById("fabMenu");
+const FABTOP = document.getElementById("fabTop");
 
 /* appearance: one of light / green / dark (green = the original dark palette) */
 function applyTheme(){
@@ -2256,6 +2290,7 @@ function render(){
   try{
     const showFab = state.tab==="today" || state.tab==="tasks" || state.tab==="notes";
     FAB.hidden = !showFab;
+    FABTOP.hidden = !showFab;   // v3.151: 「ページの先頭へ」もFABと同じ条件で出す
     M.classList.toggle("has-fab", showFab);
     if(state.tab!=="today"){ FABM.hidden = true; }   // the FAB menu is a today-only thing
   }catch(e){ console.error("FAB visibility update failed", e); }
@@ -2276,8 +2311,6 @@ const GEAR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 /* スケジュール日付欄の「テンプレート作成」ショートカット用アイコン（today アイコンの
    カレンダーに + を入れたもの＝「予定の型を追加」を連想させる） */
 const TPL_ADD_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/><path d="M12 12.5v5M9.5 15h5"/></svg>`;
-/* ページの先頭へ戻るボタン用アイコン（上向き矢印＋上端の線） */
-const TOP_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5h14"/><path d="M12 20V9M6.5 13.5 12 8l5.5 5.5"/></svg>`;
 
 function renderHeader(){
   if(state.tab==="today"){
@@ -2290,7 +2323,6 @@ function renderHeader(){
         <div class="h-view">${TAB_ICONS.today}スケジュール</div>
         <div class="h-actions">
           <span class="h-nowdate">${esc(fmtNowDate())}<span class="h-nowtime">${esc(fmtNowTime())}</span></span>
-          <button class="icon-btn" data-act="scroll-top" aria-label="ページの先頭へ">${TOP_ICON}</button>
           <button class="icon-btn" data-act="go-settings" aria-label="設定">${GEAR_ICON}</button>
         </div>
       </div>
@@ -2314,8 +2346,7 @@ function renderHeader(){
       ? `<button class="hbtn" data-act="go-today">‹ 戻る</button>`
       : (state.tab==="notes" && state.noteId)
         ? `<button class="hbtn" data-act="notes-back">‹ 一覧</button>`
-        : `<button class="icon-btn" data-act="scroll-top" aria-label="ページの先頭へ">${TOP_ICON}</button>
-           <button class="icon-btn" data-act="go-settings" aria-label="設定">${GEAR_ICON}</button>`;
+        : `<button class="icon-btn" data-act="go-settings" aria-label="設定">${GEAR_ICON}</button>`;
     H.innerHTML = `
       <div class="header-top">
         <div class="h-view">${icon}${label}</div>
@@ -3563,7 +3594,7 @@ function sheetAddOcc(taskId){
 function sheetRemark(id){
   const r = id ? db.remarks.find(x=>x.id===id) : null;
   openSheet(`<h2>${r ? "覚え書きを編集" : "覚え書きを追加"}</h2>
-    <label class="fld"><span>内容</span><textarea id="rmText" class="fld-note" placeholder="例: 換気を忘れずに">${esc(r?.text||"")}</textarea></label>
+    <label class="fld"><span>内容</span>${noteTextarea("rmText", r?.text, "例: 換気を忘れずに")}</label>
     <label class="fld"><span>重要度</span></label>
     <div class="radio-row" id="rmPrio">
       <button data-v="high" class="${(r?.prio||"low")==="high"?"on":""}">高</button>
@@ -3684,7 +3715,7 @@ function sheetMarker(id){
       <input type="checkbox" id="mkFree" ${m?.freeBlock?"checked":""} style="width:18px;height:18px;flex:none">
       <span>自由時間として扱う（タイムラインには残るが、「ひと段落」の提案ではこの時間帯も空き扱いにする）</span>
     </label>
-    <label class="fld"><span>備考（任意）</span><textarea id="mkNote" class="fld-note" placeholder="補足など">${esc(m?.note||"")}</textarea></label>
+    <label class="fld"><span>備考（任意）</span>${noteTextarea("mkNote", m?.note, "補足など")}</label>
     <div class="sheet-actions">
       ${m ? `<button class="btn ghost" style="flex:0;color:var(--over)" data-act="del-marker" data-id="${m.id}">削除</button>` : ""}
       <button class="btn ghost" data-act="close-sheet">キャンセル</button>
@@ -3717,8 +3748,8 @@ function sheetOccEdit(id){
       <button type="button" class="mini-clear" data-act="oe-clear-span">クリア</button>
     </div>
     <p class="sheet-sub" style="margin-top:2px">終了か所要のどちらかでよい（両方入れたら終了を優先）。全部空欄なら「時間未定」になる。</p>
-    ${t ? `<label class="fld"><span>備考（任意・タスクの説明）</span><textarea id="oeTaskNote" class="fld-note" placeholder="手順・持ち物・詳細など">${esc(t.note||"")}</textarea></label>` : ""}
-    <label class="fld"><span>進捗メモ（任意）</span><textarea id="oeNote" class="fld-note" placeholder="例: 第3章まで／下書きだけ・補足など">${esc(o.note||"")}</textarea></label>
+    ${t ? `<label class="fld"><span>備考（任意・タスクの説明）</span>${noteTextarea("oeTaskNote", t.note, "手順・持ち物・詳細など")}</label>` : ""}
+    <label class="fld"><span>進捗メモ（任意）</span>${noteTextarea("oeNote", o.note, "例: 第3章まで／下書きだけ・補足など")}</label>
     <div class="sheet-actions">
       <button class="btn ghost" style="flex:0;color:var(--over)" data-act="del-occ" data-id="${id}">削除</button>
       <button class="btn ghost" data-act="close-sheet">キャンセル</button>
@@ -3804,8 +3835,8 @@ function sheetTask(taskId){
         <input type="number" id="tkMin" class="short" inputmode="numeric" value="${t?.estMin ?? ""}" min="1" placeholder="分">
         <button type="button" class="mini-clear" data-act="tk-min-clear">クリア</button>
       </div></label>
-    <label class="fld"><span>備考（任意）</span><textarea id="tkNote" class="fld-note" placeholder="手順・持ち物・詳細など">${esc(t?.note||"")}</textarea></label>
-    ${latestOcc ? `<label class="fld"><span>進捗メモ（任意・${latestOcc.date===todayStr()?"今日":esc(fmtDateShort(latestOcc.date))+"時点"}の実施ぶん）</span><textarea id="tkProgress" class="fld-note" data-occid="${latestOcc.id}" placeholder="例: 第3章まで／下書きだけ・補足など">${esc(latestOcc.note||"")}</textarea></label>` : ""}
+    <label class="fld"><span>備考（任意）</span>${noteTextarea("tkNote", t?.note, "手順・持ち物・詳細など")}</label>
+    ${latestOcc ? `<label class="fld"><span>進捗メモ（任意・${latestOcc.date===todayStr()?"今日":esc(fmtDateShort(latestOcc.date))+"時点"}の実施ぶん）</span>${noteTextarea("tkProgress", latestOcc.note, "例: 第3章まで／下書きだけ・補足など", ` data-occid="${latestOcc.id}"`)}</label>` : ""}
     ${t?`<div class="sheet-actions">
       <button class="btn ghost" style="color:var(--over)" data-act="del-task" data-id="${t.id}">削除</button>
     </div>`:""}
@@ -3919,6 +3950,16 @@ document.addEventListener("click", e=>{
     case "edit-day": state.tab = "today"; state.date = v; render(); M.scrollTop = 0; break;
     case "go-settings": state.tab="settings"; render(); M.scrollTop=0; break;
     case "scroll-top": M.scrollTop = 0; break;
+    // v3.151: メモ欄の拡大/縮小トグル。表示上の見た目だけの操作なので
+    // save()/render()は呼ばない——呼ぶと入力中の未保存テキストが消えてしまう。
+    case "toggle-note-expand": {
+      const ta = document.getElementById(id);
+      if(!ta) break;
+      const expanding = !ta.classList.contains("expanded");
+      ta.classList.toggle("expanded", expanding);
+      el.textContent = expanding ? "縮小" : "拡大";
+      break;
+    }
     case "go-tpl-edit": {
       const m = db.dayMeta[state.date];
       state.tab = "templates";
