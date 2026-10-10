@@ -77,7 +77,7 @@ try{
   console.log("SCRIPT THREW ON LOAD:", e.message);
   process.exit(1);
 }
-vm.runInContext(`globalThis.__t = { get db(){ return db; }, set db(v){ db=v; }, todayStr, renderToday, settings };`, sandbox);
+vm.runInContext(`globalThis.__t = { get db(){ return db; }, set db(v){ db=v; }, todayStr, renderToday, settings, state, addDays };`, sandbox);
 const T = sandbox.__t;
 const today = T.todayStr();
 
@@ -132,6 +132,25 @@ ok("settings().hideTimeTicks becomes false again after toggling back", T.setting
 {
   const html = elStore.main._html;
   ok("a bare tick row shows its time label again after toggling back on", /tl-row tick[^"]*">[^<]*<div class="tl-time">\d/.test(html));
+}
+
+// --- 4. 今日だけでなく、過去・未来の日でも同じトグルボタンが出る ---
+// （最初の実装はisToday限定だったが、「今日だけではなくて、過去未来も
+// 同様にオンオフが出来るようにして」という指示で変更）
+{
+  T.state.date = T.addDays(today, -3);
+  T.renderToday();
+  const htmlPast = elStore.main._html;
+  ok("the toggle button also appears on a past day", htmlPast.includes('data-act="toggle-tick-labels"'));
+  ok("a past day still shows its own section title", htmlPast.includes("この日の予定・実績"));
+
+  T.state.date = T.addDays(today, 5);
+  T.renderToday();
+  const htmlFuture = elStore.main._html;
+  ok("the toggle button also appears on a future day", htmlFuture.includes('data-act="toggle-tick-labels"'));
+  ok("a future day still shows its own section title", htmlFuture.includes("この日の予定"));
+
+  T.state.date = today;
 }
 
 console.log(fail === 0 ? "\nALL PASS" : `\n${fail} FAILURES`);

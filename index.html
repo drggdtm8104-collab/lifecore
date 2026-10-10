@@ -943,7 +943,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.149";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.150";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2474,10 +2474,10 @@ function renderToday(){
   // いる行のラベルはそのまま出す。ドット（.tl-node）は常に通常どおり表示
   // する（この指定で変えない）。今日の流れの行にだけ置くボタンだが、設定
   // 自体(settings().hideTimeTicks)は他の日のタイムラインにも効く。
+  // v3.150: 今日だけでなく、過去・未来の日のタイムラインでも同じトグルを
+  // 出せるようにする（指示により isToday 限定をやめた）。
   const ticksOn = settings().hideTimeTicks !== true;
-  const tickToggleBtn = isToday
-    ? `<button class="btn ${ticksOn?"primary":"ghost"} tiny" data-act="toggle-tick-labels" style="margin-right:8px;${ticksOn?"":"opacity:.5"}">時間目盛ON</button>`
-    : "";
+  const tickToggleBtn = `<button class="btn ${ticksOn?"primary":"ghost"} tiny" data-act="toggle-tick-labels" style="margin-right:8px;${ticksOn?"":"opacity:.5"}">時間目盛ON</button>`;
   html += `<div class="sec-title" style="display:flex;align-items:center">${tickToggleBtn}<span>${isToday ? "今日の流れ" : (d < todayStr() ? "この日の予定・実績" : "この日の予定")}</span></div>`;
   if(!hasItems && !carryBlocks.length){
     html += `<div class="tl-hint">${isToday ? "まだ予定はありません。テンプレートを選ぶか、右下の＋から追加できます。" : "まだ何もありません。右下の＋から追加できます。"}</div>`;
