@@ -1049,7 +1049,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.159";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.160";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3464,6 +3464,18 @@ function renderSettings(){
      <pre class="io" style="white-space:pre-wrap;min-height:80px">${esc(debugLog.slice(-24).join("\n") || "(なし)")}</pre>
      <div style="margin-top:8px"><button class="btn" data-act="copy-debug">コピー</button></div>`);
 
+  // v3.160お試し: Claudeへの開発指示を書いておくための専用メモ。
+  // 他のメモ（db.notes）・覚え書き（db.remarks）とは別物として、
+  // settings().devMemoという単独の文字列フィールドに持たせる——既存の
+  // settingsの同期経路（core/main）にそのまま乗るので、新しい同期の
+  // 仕組みを増やす必要がない。使ったら自分で「クリア」で消す運用
+  // （Claude側が直接クラウドのデータを書き換えるのは、アプリ自身の同期
+  // ロジックと競合する危険があるため避ける）。
+  html += setCard("devmemo", "開発メモ（お試し）", ()=>
+    `<p>Claudeへの開発指示を書いておくための専用メモです。他のメモ・覚え書きとは別に保存されます。指示として使い終わったら「クリア」で消してください。</p>
+     <textarea class="io" id="devMemoArea" placeholder="例: ◯◯の不具合を直して、など">${esc(settings().devMemo||"")}</textarea>
+     <div style="margin-top:8px"><button class="btn ghost" style="color:var(--over)" data-act="clear-dev-memo">クリア</button></div>`);
+
   html += setCard("reset", "リセット", ()=>
     `<p>「記録をリセット」はタスク・実施・履歴だけを消し、<strong>テンプレートと設定は残します</strong>。「すべて初期化」はテンプレートも含めて出荷状態に戻します。</p>
      <button class="btn" style="color:var(--over);border-color:var(--over)" data-act="reset-records">記録をリセット</button>
@@ -4321,6 +4333,7 @@ document.addEventListener("click", e=>{
       render(); break;
     }
     case "toggle-outlook": settings().showOutlook = (settings().showOutlook===false); save(); render(); break;
+    case "clear-dev-memo": settings().devMemo = ""; save(); render(); break;
     case "toggle-tick-labels": settings().hideTimeTicks = (settings().hideTimeTicks !== true); save(); render(); break;
     case "toggle-push": {
       (async ()=>{
@@ -4754,7 +4767,7 @@ function readTplEditor(){
    or "保存". */
 document.addEventListener("focusout", e=>{
   const el = e.target;
-  if(el && (el.id === "noteBody" || el.id === "noteTitle")){ flushNoteSave(); return; }
+  if(el && (el.id === "noteBody" || el.id === "noteTitle" || el.id === "devMemoArea")){ flushNoteSave(); return; }
   if(!el || !el.closest || !el.closest('#tplForm')) return;
   readTplEditor();
 });
@@ -4762,6 +4775,7 @@ document.addEventListener("focusout", e=>{
 /* メモ: 打つたびに in-memory を更新し、少し待ってから保存（再描画はしない） */
 document.addEventListener("input", e=>{
   const el = e.target;
+  if(el && el.id === "devMemoArea"){ settings().devMemo = el.value; scheduleNoteSave(); return; }
   if(!el || (el.id !== "noteBody" && el.id !== "noteTitle")) return;
   const n = db.notes.find(x=>x.id===state.noteId);
   if(!n) return;
