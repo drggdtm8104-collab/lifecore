@@ -1049,7 +1049,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.160";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.161";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3471,8 +3471,15 @@ function renderSettings(){
   // 仕組みを増やす必要がない。使ったら自分で「クリア」で消す運用
   // （Claude側が直接クラウドのデータを書き換えるのは、アプリ自身の同期
   // ロジックと競合する危険があるため避ける）。
+  // v3.161: GitHub Pages版（window.claude無し）では、ここに書いても
+  // クラウドに届かずClaudeから見えない——判明した実機の制約。同期できる
+  // 側（Artifact版）へワンタップで飛べるリンクを、同期できない時だけ
+  // 出す（#devmemoハッシュで着地後、設定タブ・このカードまで自動で開く）。
+  const canSyncDevMemo = !!(window.claude && window.claude.use);
   html += setCard("devmemo", "開発メモ（お試し）", ()=>
     `<p>Claudeへの開発指示を書いておくための専用メモです。他のメモ・覚え書きとは別に保存されます。指示として使い終わったら「クリア」で消してください。</p>
+     ${canSyncDevMemo ? "" : `<p class="sheet-sub" style="color:var(--over)">この開き方（ホーム画面など）だと同期されずClaudeに届きません。↓のリンクから開いて書いてください。</p>
+     <a class="btn primary" style="width:100%;text-decoration:none;display:block;text-align:center;margin-bottom:8px" target="_blank" rel="noopener" href="https://claude.ai/artifact/6JXB1Ztzkj5h9rnHmd49rf#devmemo">同期できる版を開く ↗</a>`}
      <textarea class="io" id="devMemoArea" placeholder="例: ◯◯の不具合を直して、など">${esc(settings().devMemo||"")}</textarea>
      <div style="margin-top:8px"><button class="btn ghost" style="color:var(--over)" data-act="clear-dev-memo">クリア</button></div>`);
 
@@ -4838,7 +4845,18 @@ document.getElementById("sheetWrap").addEventListener("click", e=>{
 });
 
 /* ---------- go ---------- */
-try{ render(); if(state.tab==="today" && state.date===todayStr()) scrollToNow(); }
+// v3.161: GitHub Pages版（window.claude無し）の「開発メモ」カードから
+// クラウド版（Artifact版）へのリンクを辿って来た時、設定タブ→開発メモの
+// カードまで毎回手で移動しなくて済むように、#devmemoハッシュで直接開く。
+if(location.hash === "#devmemo"){
+  state.tab = "settings";
+  state._setOpen.add("devmemo");
+}
+try{
+  render();
+  if(state.tab==="today" && state.date===todayStr()) scrollToNow();
+  if(location.hash === "#devmemo") document.getElementById("devMemoArea")?.focus();
+}
 catch(e){ console.error("initial render failed", e); }   // instant paint from the local cache
 // v3.88: この端末の保存データが壊れていてサンプルへフォールバックした場合、
 // 以前は無言でサンプル状態から始まっていた（同期でクラウドの内容に
