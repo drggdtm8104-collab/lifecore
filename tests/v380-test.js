@@ -62,8 +62,9 @@ vm.runInContext(`renderSettings()`, sandbox);
 html = sandbox.document.getElementById("main").innerHTML;
 check(!html.includes('data-act="toggle-outlook"'), "もう一度押すと閉じる");
 
-// regression: other setCard sections still work (spot check "sync")
-check(html.includes('data-act="toggle-set" data-v="sync"'), "同期・保存先の折りたたみも引き続き存在する（回帰なし）");
+// regression: other setCard sections still work (spot check "export";
+// v3.165で「同期・保存先」カード自体を削除したため、別のカードに変更)
+check(html.includes('data-act="toggle-set" data-v="export"'), "バックアップ（書き出し）の折りたたみも引き続き存在する（回帰なし）");
 
 console.log(ok ? "\nALL PASS" : "\nSOME FAILED");
 process.exit(ok?0:1);
