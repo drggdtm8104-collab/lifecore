@@ -77,13 +77,12 @@ check("sheetOccEdit: button now labeled クリア (not 終了・所要をなし�
 // dispatch oe-clear-span with all 3 fields filled -> should clear all 3
 const oeStart = getEl("oeStart"); oeStart.value = "09:00";
 const oeEnd = getEl("oeEnd"); oeEnd.value = "10:00";
-const oeMin = getEl("oeMin"); oeMin.value = "60";
 const btn1 = { dataset:{ act:"oe-clear-span" }, disabled:false };
 const fakeEvent1 = { target: { closest: (sel) => sel === "[data-act]" ? btn1 : null } };
 clickListeners.forEach(fn => fn(fakeEvent1));
 check("oe-clear-span clears oeStart", oeStart.value === "");
 check("oe-clear-span clears oeEnd", oeEnd.value === "");
-check("oe-clear-span clears oeMin", oeMin.value === "");
+// v3.158: 所要時間の手入力欄(oeMin)自体を廃止したため、このチェックは撤去。
 
 // --- 2. cardHTML: editBtn moved to card-head, before statusHTML, only for listView ---
 const srcCardHTML = sandbox.cardHTML.toString();

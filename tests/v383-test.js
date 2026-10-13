@@ -83,13 +83,12 @@ check("sheetTask: new-task title is タスクを登録", srcTask.includes("タ�
 // dispatch ao-clear-time via real click handler
 const aoStart = getEl("aoStart"); aoStart.value = "09:00";
 const aoEnd = getEl("aoEnd"); aoEnd.value = "10:00";
-const aoMin = getEl("aoMin"); aoMin.value = "30";
 const btn = { dataset:{ act:"ao-clear-time" }, disabled:false };
 const fakeEvent = { target: { closest: (sel) => sel === "[data-act]" ? btn : null } };
 clickListeners.forEach(fn => fn(fakeEvent));
 check("ao-clear-time clears aoStart", aoStart.value === "");
 check("ao-clear-time clears aoEnd", aoEnd.value === "");
-check("ao-clear-time clears aoMin", aoMin.value === "");
+// v3.158: 所要時間の手入力欄(aoMin)自体を廃止したため、このチェックは撤去。
 
 // dispatch add-today with blank time -> should behave like old "untimed"
 const db = (function(){ try { return JSON.parse(sandbox.localStorage.getItem("lifecore.v1")).tasks ? null : null; } catch(e){ return null; } })();

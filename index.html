@@ -845,10 +845,24 @@
   .tpl-line .tl-r2 input[type="time"]{height:32px;width:74px;flex:none}
   .tpl-line .tl-r2 input[type="number"]{height:32px;width:44px;flex:none}
   .tpl-line .tl-r2 input[type="checkbox"]{width:18px;height:18px}
-  /* 開始〜終了・所要 を1行に収める共通レイアウト（シート用） */
+  /* 開始〜終了・所要 を1行に収める共通レイアウト（シート用、テンプレ編集で使用） */
   .time-row{display:flex;gap:6px;align-items:center;margin-top:4px;flex-wrap:wrap}
-  .mini-clear.on{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
   .time-row .tr-sep{flex:none;color:var(--faint);font-size:12px}
+  /* v3.158: 開始・終了を別行に分け、両脇に±1分・±5分ボタンを置くレイアウト
+     （タスクの時間編集・予定編集・ToDo追加時の時間入力で使用）。 */
+  .time-stepper-row{display:flex;gap:6px;align-items:center;margin-top:6px}
+  .time-stepper-row .ts-label{flex:none;width:34px;font-size:11.5px;color:var(--muted)}
+  .time-stepper-row input[type="time"]{
+    flex:1;min-width:0;height:38px;min-height:38px;padding:0 6px;
+    box-sizing:border-box;font-family:var(--font-mono);text-align:center;
+  }
+  .ts-btn{
+    flex:none;width:34px;height:34px;border-radius:9px;
+    border:1px solid var(--hairline);background:var(--surface);
+    color:var(--muted);font-size:12px;font-weight:600;
+    font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  }
+  .ts-btn:active{background:var(--surface-2)}
   .time-row input[type="time"]{height:38px;min-height:38px;width:82px;padding:0 6px;box-sizing:border-box;flex:none;font-family:var(--font-mono)}
   .time-row input[type="number"]{height:38px;min-height:38px;width:52px;padding:0 6px;box-sizing:border-box;flex:none}
   .mini-x{width:26px;height:26px;border-radius:7px;border:1px solid var(--hairline);display:grid;place-items:center;color:var(--muted);flex:none}
@@ -1033,7 +1047,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.157";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.158";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1204,12 +1218,22 @@ function loadLocal(){
   return migrate(seed());
 }
 const settings = () => (db.settings || (db.settings = { showOutlook:true }));
-// v3.157: 時間入力(<input type="time">)を5分刻みで選べるようにするトグル。
-// 誤タップでの時刻選択が速くなるよう、ネイティブのstep属性(秒単位。
-// 5分=300)を切り替える。クリアボタンの横に置く想定。
-const timeStepAttr = () => settings().timeStep5 ? ' step="300"' : "";
-function timeStepToggleBtn(){
-  return `<button type="button" class="mini-clear${settings().timeStep5?" on":""}" data-act="toggle-time-step">5分刻み</button>`;
+// v3.158: v3.157のstep属性トグルは、iOS Safariのネイティブ時刻ピッカーが
+// step属性をピッカーUI自体には反映しない（フォーム検証にしか使わない）
+// ことが判明したため撤去。代わりに、開始・終了を別の行に分け、それぞれの
+// 時刻入力の両脇に±1分・±5分の調整ボタンを置く方式に置き換える
+// （ネイティブピッカーで大まかに合わせてから、ボタンで細かく微調整する
+// 使い方を想定）。所要時間の手入力欄も、ほぼ使われていないとのことなので
+// 同時に廃止し、開始・終了から自動で算出する一本化にした。
+function timeRow(label, inputId, value, clearAct){
+  return `<div class="time-stepper-row">
+    <span class="ts-label">${esc(label)}</span>
+    <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="-5">−5</button>
+    <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="-1">−1</button>
+    <input type="time" id="${inputId}" value="${esc(value||"")}">
+    <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="1">+1</button>
+    <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="5">+5</button>
+  </div>`;
 }
 
 /* ---- v3.0 model migration (idempotent) ----
@@ -3654,15 +3678,10 @@ function sheetAddOcc(taskId){
   const t = db.tasks.find(x=>x.id===taskId); if(!t) return;
   openSheet(`<h2>${esc(t.name)}</h2>
     <p class="sheet-sub">開始時刻を入れると時間割に置かれます。空欄なら「時間未定」で追加。</p>
-    <label class="fld"><span>開始 〜 終了・所要（空欄可）</span></label>
-    <div class="time-row">
-      <input type="time" id="aoStart"${timeStepAttr()}>
-      <span class="tr-sep">〜</span>
-      <input type="time" id="aoEnd"${timeStepAttr()}>
-      <input type="number" id="aoMin" inputmode="numeric" value="${t.estMin ?? ""}" min="1" placeholder="分">
-      <button type="button" class="mini-clear" data-act="ao-clear-time">クリア</button>
-      ${timeStepToggleBtn()}
-    </div>
+    <label class="fld"><span>開始 〜 終了（空欄可）</span></label>
+    ${timeRow("開始", "aoStart", "")}
+    ${timeRow("終了", "aoEnd", "")}
+    <button type="button" class="mini-clear" data-act="ao-clear-time">クリア</button>
     <div class="sheet-actions">
       <button class="btn ghost" data-act="close-sheet">キャンセル</button>
       <button class="btn primary" data-act="add-today" data-id="${taskId}">タスクを追加</button>
@@ -3784,16 +3803,11 @@ function sheetMarker(id){
   openSheet(`<h2>${m ? "予定を編集" : "予定を追加"}</h2>
     <p class="sheet-sub">その時間なにをしているかの表示です。完了などのチェックはつきません（例: 美容院、来客、外出）。この日だけに入ります。</p>
     <label class="fld"><span>内容</span><input type="text" id="mkName" value="${esc(m?.title||"")}" placeholder="例: 美容院"></label>
-    <label class="fld"><span>開始 〜 終了・所要</span></label>
-    <div class="time-row">
-      <input type="time" id="mkStart" value="${esc(m?.plannedStart||"")}"${timeStepAttr()}>
-      <span class="tr-sep">〜</span>
-      <input type="time" id="mkEnd" value="${esc(curEnd)}"${timeStepAttr()}>
-      <input type="number" id="mkMin" inputmode="numeric" value="${m?.plannedMin||""}" min="1" placeholder="分">
-      ${timeStepToggleBtn()}
-    </div>
-    <p class="sheet-sub" style="margin-top:2px">終了か所要のどちらかでよい（両方入れたら終了を優先）。両方空欄なら「時点」の予定。
-      <button type="button" class="mini-clear" data-act="mk-clear-span">終了・所要をなしにする</button></p>
+    <label class="fld"><span>開始 〜 終了（空欄可）</span></label>
+    ${timeRow("開始", "mkStart", m?.plannedStart||"")}
+    ${timeRow("終了", "mkEnd", curEnd)}
+    <p class="sheet-sub" style="margin-top:2px">両方空欄なら「時点」の予定。
+      <button type="button" class="mini-clear" data-act="mk-clear-span">終了をなしにする</button></p>
     <label class="fld"><span>カテゴリ</span></label>
     <div class="radio-row" id="mkCat">
       ${CATS.map(c=>`<button data-v="${c}" class="${curCat===c?"on":""}">${c}</button>`).join("")}
@@ -3826,16 +3840,11 @@ function sheetOccEdit(id){
     ${isAdhoc
       ? `<label class="fld"><span>内容</span><input type="text" id="oeName" value="${esc(o.title||"")}"></label>`
       : `<p class="sheet-sub">タスク: ${esc(t?.name || "(削除済み)")}</p>`}
-    <label class="fld"><span>開始 〜 終了・所要（開始は空欄可）</span></label>
-    <div class="time-row">
-      <input type="time" id="oeStart" value="${esc(o.plannedStart||"")}"${timeStepAttr()}>
-      <span class="tr-sep">〜</span>
-      <input type="time" id="oeEnd" value="${esc(curEnd)}"${timeStepAttr()}>
-      <input type="number" id="oeMin" inputmode="numeric" value="${o.plannedMin||""}" min="1" placeholder="分">
-      <button type="button" class="mini-clear" data-act="oe-clear-span">クリア</button>
-      ${timeStepToggleBtn()}
-    </div>
-    <p class="sheet-sub" style="margin-top:2px">終了か所要のどちらかでよい（両方入れたら終了を優先）。全部空欄なら「時間未定」になる。</p>
+    <label class="fld"><span>開始 〜 終了（開始は空欄可）</span></label>
+    ${timeRow("開始", "oeStart", o.plannedStart||"")}
+    ${timeRow("終了", "oeEnd", curEnd)}
+    <button type="button" class="mini-clear" data-act="oe-clear-span">クリア</button>
+    <p class="sheet-sub" style="margin-top:2px">全部空欄なら「時間未定」になる。</p>
     ${t ? `<label class="fld"><span>備考（任意・タスクの説明）</span>${noteTextarea("oeTaskNote", t.note, "手順・持ち物・詳細など")}</label>` : ""}
     <label class="fld"><span>進捗メモ（任意）</span>${noteTextarea("oeNote", o.note, "例: 第3章まで／下書きだけ・補足など")}</label>
     <div class="sheet-actions">
@@ -4108,8 +4117,8 @@ document.addEventListener("click", e=>{
     }
     case "edit-marker": sheetMarker(id); break;
     case "mk-clear-span": {
-      const e = document.getElementById("mkEnd"), mn = document.getElementById("mkMin");
-      if(e) e.value = ""; if(mn) mn.value = "";
+      const e = document.getElementById("mkEnd");
+      if(e) e.value = "";
       break;
     }
     case "save-marker": {
@@ -4118,8 +4127,7 @@ document.addEventListener("click", e=>{
       const st = document.getElementById("mkStart").value || null;
       if(!st){ document.getElementById("mkStart").focus(); toast("開始時刻を入れてください"); break; }
       const end = (document.getElementById("mkEnd").value||"").trim();
-      const rawMin = (document.getElementById("mkMin").value||"").trim();
-      let mins = end ? durFromEnd(st, end) : (rawMin === "" ? null : (parseInt(rawMin,10) || null));
+      let mins = end ? durFromEnd(st, end) : null;
       if(mins === 0) mins = null;
       const cat = document.querySelector("#mkCat button.on")?.dataset.v || "その他";
       const note = (document.getElementById("mkNote")?.value || "").trim();
@@ -4173,8 +4181,8 @@ document.addEventListener("click", e=>{
 
     case "pick-add": sheetAddOcc(id); break;
     case "ao-clear-time": {
-      const s = document.getElementById("aoStart"), e = document.getElementById("aoEnd"), m = document.getElementById("aoMin");
-      if(s) s.value = ""; if(e) e.value = ""; if(m) m.value = "";
+      const s = document.getElementById("aoStart"), e = document.getElementById("aoEnd");
+      if(s) s.value = ""; if(e) e.value = "";
       break;
     }
     case "add-today": {
@@ -4186,8 +4194,7 @@ document.addEventListener("click", e=>{
       let pm = null;
       if(st){
         const end = (document.getElementById("aoEnd")?.value || "").trim();
-        const rawMin = (document.getElementById("aoMin")?.value || "").trim();
-        pm = end ? durFromEnd(st, end) : (rawMin === "" ? (t.estMin ?? null) : (parseInt(rawMin,10) || null));
+        pm = end ? durFromEnd(st, end) : (t.estMin ?? null);
         if(pm === 0) pm = null;
       } else {
         pm = (t.estMin ?? null);   // untimed keeps the task's estimate as the guide
@@ -4253,25 +4260,22 @@ document.addEventListener("click", e=>{
     }
     case "edit-occ": case "set-time": sheetOccEdit(id); break;
     case "oe-clear-span": {
-      const s = document.getElementById("oeStart"), e = document.getElementById("oeEnd"), m = document.getElementById("oeMin");
-      if(s) s.value = ""; if(e) e.value = ""; if(m) m.value = "";
+      const s = document.getElementById("oeStart"), e = document.getElementById("oeEnd");
+      if(s) s.value = ""; if(e) e.value = "";
       toast("時間をクリアしました（保存で確定）");
       break;
     }
-    // v3.157: 時間入力の5分刻みトグル。開いているシートの時間欄(存在する
-    // ものだけ)のstep属性を直接書き換える——render()は呼ばない（呼ぶと
-    // シートの入力中の内容が消えてしまう）。設定自体は保存するので次回
-    // シートを開いた時も引き続き反映される。
-    case "toggle-time-step": {
-      settings().timeStep5 = !settings().timeStep5;
-      save();
-      const stepVal = settings().timeStep5 ? "300" : null;
-      ["aoStart","aoEnd","oeStart","oeEnd","mkStart","mkEnd"].forEach(tid=>{
-        const inp = document.getElementById(tid);
-        if(!inp) return;
-        if(stepVal) inp.setAttribute("step", stepVal); else inp.removeAttribute("step");
-      });
-      document.querySelectorAll('[data-act="toggle-time-step"]').forEach(b=>b.classList.toggle("on", settings().timeStep5));
+    // v3.158: 開始・終了それぞれの時刻入力の両脇にある±1分/±5分ボタン。
+    // 対象の時刻欄の現在値にdata-v分だけ加減し、24時をまたぐ場合は
+    // 日をまたいだ時刻として折り返す（ネイティブtime入力の仕様に合わせる）。
+    // render()は呼ばない——入力中の他の項目を消さないため。
+    case "time-step": {
+      const inp = document.getElementById(id);
+      if(!inp || !inp.value) break;
+      const [hh,mm] = inp.value.split(":").map(Number);
+      const delta = parseInt(v, 10) || 0;
+      const total = (((hh*60+mm) + delta) % 1440 + 1440) % 1440;
+      inp.value = pad(Math.floor(total/60)) + ":" + pad(total%60);
       break;
     }
     case "save-occ": {
@@ -4282,8 +4286,7 @@ document.addEventListener("click", e=>{
       if(!st){ o.plannedMin = null; }
       else {
         const end = (document.getElementById("oeEnd").value||"").trim();
-        const rawMin = (document.getElementById("oeMin").value||"").trim();
-        let m = end ? durFromEnd(st, end) : (rawMin === "" ? null : (parseInt(rawMin,10) || null));
+        let m = end ? durFromEnd(st, end) : null;
         if(m === 0) m = null;
         o.plannedMin = m;
       }
