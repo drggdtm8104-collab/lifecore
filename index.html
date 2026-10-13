@@ -1049,7 +1049,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.163";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.164";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1986,7 +1986,6 @@ const fieldChip = (label, val, cls="") =>
    ユーザー指摘の通り、着手可能かどうかは並び順の判断材料に含めない — 期限が
    他より近ければ、まだ着手できないタスクでも普通に上に来る。開始時期そのものは
    行の中に日付として表示されるので、情報としては残る。 */
-const bySingle = (a,b) => prioRank(a) - prioRank(b) || byDue(a,b);
 /* タスク一覧の並べ替え（v3.32/v3.34）:
    「重要度順」「期限順」はバケット分けせず全体を1本の軸で並べる。
    v3.93: 同着の並びを明文化。「重要度順」「期限順」それぞれで、期限・重要度が
@@ -3125,39 +3124,6 @@ function insightsHTML(){
   return html;
 }
 
-/* readable text dump of every still-open task (タスクタブに出るもの) — for keeping
-   a plain-text copy outside the app */
-function openTasksText(){
-  const repeats = db.tasks.filter(t=>t.kind==="repeat");
-  const singles = db.tasks.filter(t=>t.kind==="single" && !t.done).slice().sort(bySingle);
-  const freqTxt = t => t.freq?.type==="daily" ? "毎日" : t.freq?.type==="perWeek" ? `週${t.freq.n}回` : "";
-  const line = t => {
-    const bits = [t.category || "その他"];
-    if(t.kind==="repeat" && freqTxt(t)) bits.push(freqTxt(t));
-    if(t.estMin) bits.push(`目安${t.estMin}分`);
-    if(t.kind==="single" && t.prio && t.prio!=="low") bits.push(`重要${PRIO[t.prio]}`);
-    if(t.kind==="single" && t.startDate) bits.push(`着手 ${dateLabel(t.startDate, t.startPrec)}`);
-    if(t.kind==="single" && t.due) bits.push(`期限 ${dateLabel(t.due, t.duePrec)}`);
-    let s = `- ${t.name}  （${bits.join(" / ")}）`;
-    if(t.note) s += `\n    メモ: ${String(t.note).replace(/\s*\n\s*/g," ")}`;
-    return s;
-  };
-  const bucketLab = ["期限切れ・今日まで","7日以内","この先の期限","期限なし"];
-  let out = `LifeCore 未完了タスク一覧\n`;
-  out += `書き出し: ${new Date().toLocaleString()}  （アプリ v${APP_VERSION}）\n`;
-  out += `※ これは読みやすさ用の控えです。まるごと復元するときは、設定「バックアップ（書き出し）」の\n`;
-  out += `   JSON を設定「読み込み」に貼り付けてください。\n`;
-  out += `\n== 完了型（未完了 ${singles.length} 件）==\n`;
-  if(!singles.length) out += `（なし）\n`;
-  else [0,1,2,3].forEach(bk=>{
-    const items = singles.filter(t=>dueBucket(t.due)===bk);
-    if(items.length) out += `\n[${bucketLab[bk]}]\n` + items.map(line).join("\n") + "\n";
-  });
-  out += `\n== 継続型（${repeats.length} 件）==\n`;
-  out += repeats.length ? repeats.map(line).join("\n") + "\n" : "（なし）\n";
-  return out;
-}
-
 /* ---------- NOTES (自由メモ。タイトル欄が空なら本文の先頭行を使う) ---------- */
 const noteHasTitle = n => !!(n.title && n.title.trim());
 const noteTitle = n => {
@@ -3440,11 +3406,6 @@ function renderSettings(){
       <button class="btn ghost" data-act="reload-from-cloud">この端末のデータを消してクラウドから読み込み直す</button>`;
   });
 
-  html += setCard("tasktext", "未完了タスクの書き出し（テキスト）", ()=>
-    `<p>タスクタブに出ている未完了タスクを、読みやすいテキストにしたものです。コピーして PC のファイルなどに控えておけます。まるごとの復元には下の JSON を使ってください。</p>
-     <textarea class="io" id="tasksTextBox" readonly>${esc(openTasksText())}</textarea>
-     <div style="margin-top:8px"><button class="btn primary" data-act="copy-tasks-text">コピー</button></div>`);
-
   html += setCard("export", "バックアップ（書き出し）", ()=>
     `<p>下のテキストをコピーするか、ファイルとして保存してください。同期が無効な状態でブラウザのデータを消すと記録は失われます。定期的な控えを推奨。</p>
      <textarea class="io" id="exportBox" readonly>${esc(JSON.stringify(db))}</textarea>
@@ -3473,7 +3434,9 @@ function renderSettings(){
      <pre class="io" style="white-space:pre-wrap;min-height:80px">${esc(debugLog.slice(-24).join("\n") || "(なし)")}</pre>
      <div style="margin-top:8px"><button class="btn" data-act="copy-debug">コピー</button></div>`);
 
-  // v3.160お試し: Claudeへの開発指示を書いておくための専用メモ。
+  // v3.160: Claudeへの開発指示を書いておくための専用メモ（v3.164で
+  // 実際にArtifact版経由の指示を試し、正常に動くことを確認したため
+  // 本実装として確定——「お試し」のラベルは外した）。
   // 他のメモ（db.notes）・覚え書き（db.remarks）とは別物として、
   // settings().devMemoという単独の文字列フィールドに持たせる——既存の
   // settingsの同期経路（core/main）にそのまま乗るので、新しい同期の
@@ -3488,7 +3451,7 @@ function renderSettings(){
   // いう紛らわしさの元になる（実際に起きた）ため、入力欄・クリアボタンは
   // 同期できる時だけ出し、同期できない時は説明文＋リンクのみにする。
   const canSyncDevMemo = !!(window.claude && window.claude.use);
-  html += setCard("devmemo", "開発メモ（お試し）", ()=>
+  html += setCard("devmemo", "開発メモ", ()=>
     canSyncDevMemo
       ? `<p>Claudeへの開発指示を書いておくための専用メモです。他のメモ・覚え書きとは別に保存されます。指示として使い終わったら「クリア」で消してください。</p>
          <textarea class="io" id="devMemoArea" placeholder="例: ◯◯の不具合を直して、など">${esc(settings().devMemo||"")}</textarea>
@@ -4623,12 +4586,6 @@ document.addEventListener("click", e=>{
         setTimeout(()=>URL.revokeObjectURL(url), 1000);
         toast("ダウンロードしました");
       }catch(e){ toast("ダウンロードできません: " + e.message); }
-      break;
-    }
-    case "copy-tasks-text": {
-      const box = document.getElementById("tasksTextBox");
-      box.focus(); box.select();
-      navigator.clipboard?.writeText(box.value).then(()=>toast("コピーしました"),()=>toast("手動で選択してコピーしてください"));
       break;
     }
     case "copy-debug": {
