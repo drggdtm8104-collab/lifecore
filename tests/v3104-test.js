@@ -86,8 +86,8 @@ const T = sandbox.__t;
 T.db.remarks = [
   { id:"r1", text:"換気を忘れずに", prio:"high", showFrom:null, showTo:"2099-12-31", createdAt:"", updatedAt:"" },
 ];
-T.state.tab = "tasks";
-T.state.tasksView = "remarks";
+T.state.tab = "notes";
+T.state.notesView = "remarks";
 T.render();
 
 const html = M.innerHTML;

@@ -98,19 +98,19 @@ function dispatchClick(dataAct, dataV, dataId){
 }
 
 // 覚え書き（db.remarks）は v3.97 でメモ（db.notes）とは別の独立データとして
-// 追加され、タスクタブ内の3つ目の切替（完了型／継続型／覚え書き）として
-// 表示される（ユーザーの指示で、独立したタブではなくタスクタブの中に
-// 置かれている）。
+// 追加され、当初はタスクタブ内の3つ目の切替（完了型／継続型／覚え書き）
+// として表示されていたが、v3.162で指示により「覚え書きとメモでタブを
+// 分けて」メモタブ内の切替（覚え書き／メモ）へ統合された。
 
-// -------- Test 1: タスクタブに「覚え書き」の切替セグメントがある --------
-T.state.tab = "tasks";
+// -------- Test 1: メモタブに「覚え書き」の切替セグメントがある --------
+T.state.tab = "notes";
 T.render();
 let mainHtml = sandbox.document.getElementById("main").innerHTML;
-ok("tasks tab shows the 覚え書き segment toggle", mainHtml.includes("覚え書き") && mainHtml.includes('data-v="remarks"') && mainHtml.includes('data-act="tasks-view"'));
+ok("notes tab shows the 覚え書き segment toggle", mainHtml.includes("覚え書き") && mainHtml.includes('data-v="remarks"') && mainHtml.includes('data-act="notes-view"'));
 
 // -------- Test 2: 覚え書きが0件のときは空状態メッセージが出る --------
 T.db.remarks = [];
-T.state.tasksView = "remarks";
+T.state.notesView = "remarks";
 T.render();
 mainHtml = sandbox.document.getElementById("main").innerHTML;
 ok("empty remarks view shows the empty-state hint", mainHtml.includes("覚え書きはまだありません"));

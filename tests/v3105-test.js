@@ -92,8 +92,8 @@ T.db.remarks = [
   { id:"withPeriod", text:"期間ありの覚え書き", prio:"low", showFrom:T0, showTo:future, createdAt:"", updatedAt:"" },
   { id:"expired", text:"期限切れの覚え書き", prio:"high", showFrom:past2, showTo:past, createdAt:"", updatedAt:"" },
 ];
-T.state.tab = "tasks";
-T.state.tasksView = "remarks";
+T.state.tab = "notes";
+T.state.notesView = "remarks";
 T.render();
 const html = M.innerHTML;
 

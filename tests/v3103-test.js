@@ -144,8 +144,8 @@ T.db.remarks = [
   { id:"r1", text:"重要な覚え書き", prio:"high", showFrom:null, showTo:null, createdAt:"", updatedAt:"" },
   { id:"r2", text:"期限切れの覚え書き", prio:"low", showFrom:past2, showTo:past, createdAt:"", updatedAt:"" },
 ];
-T.state.tab = "tasks";
-T.state.tasksView = "remarks";
+T.state.tab = "notes";
+T.state.notesView = "remarks";
 T.render();
 ok("high-prio remark's chip rendered (重要 高)", M.innerHTML.includes("重要 高"));
 ok("out-of-period remark shows period label", M.innerHTML.includes("表示期間:"));

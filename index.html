@@ -1049,7 +1049,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.162";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.163";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1190,7 +1190,7 @@ const CONTAMINATED_TASK_IDS = new Set([
   "07858496","24446b30","5602f258","b269b4a8","7ffaf36e","06df156f","c9221e46","a94c6bc0","2acda6e8",
 ]);
 let db = loadLocal();
-let state = { tab:"today", todayView:"timeline", tplView:"timeline", tasksView:"single", taskSort:"default", pickView:"single", pickSort:"default", noteId:null, date: todayStr(), histSpan:"day", histDate: todayStr(), histView:"records", settingsTplId:null, _setOpen:new Set(), _noteOpen:new Set(), _tplDraft:null, _highlightOccId:null, _notePopoutId:null };
+let state = { tab:"today", todayView:"timeline", tplView:"timeline", tasksView:"single", taskSort:"default", pickView:"single", pickSort:"default", noteId:null, notesView:"notes", date: todayStr(), histSpan:"day", histDate: todayStr(), histView:"records", settingsTplId:null, _setOpen:new Set(), _noteOpen:new Set(), _tplDraft:null, _highlightOccId:null, _notePopoutId:null };
 
 let DB = null;                // Artifact DB namespace, or null (offline / not on claude.ai)
 let dbReady = false;
@@ -2828,51 +2828,19 @@ function renderTasks(){
   const repeats = db.tasks.filter(t=>t.kind==="repeat");
   const singlesOpen = db.tasks.filter(t=>t.kind==="single" && !t.done);
 
-  const view = (state.tasksView === "repeat" || state.tasksView === "remarks") ? state.tasksView : "single";
+  const view = state.tasksView === "repeat" ? "repeat" : "single";
   let html = "";
 
-  // 完了型 / 継続型 / 覚え書き の切り替えタブ（スクロールしても上に残る）
-  // v3.97: 「覚え書き」はメモ（db.notes）とは別の独立データ（db.remarks）を
-  // 持つ3つ目の切替。ユーザーの指示で「スケジュールかタスクの中のタブに
-  // 追加してほしい」「もともとあるメモとは別物」となったため、ここに追加。
+  // 完了型 / 継続型 の切り替えタブ（スクロールしても上に残る）
+  // v3.162: 「覚え書き」はメモタブ内（覚え書き/メモの切替）へ移動した
+  // （「もともとあるメモとは別物」という理由でここに置いていたが、
+  // 指示により「覚え書きとメモでタブを分けて」メモタブへ統合）。
   html += `<div class="seg today-seg">
     <button class="${view==="single"?"on":""}" data-act="tasks-view" data-v="single">完了型タスク${singlesOpen.length?` <span class="seg-badge">${singlesOpen.length}</span>`:""}</button>
     <button class="${view==="repeat"?"on":""}" data-act="tasks-view" data-v="repeat">継続型タスク${repeats.length?` <span class="seg-badge">${repeats.length}</span>`:""}</button>
-    <button class="${view==="remarks"?"on":""}" data-act="tasks-view" data-v="remarks">覚え書き${db.remarks.length?` <span class="seg-badge">${db.remarks.length}</span>`:""}</button>
   </div>`;
 
-  if(view === "remarks"){
-    if(!db.remarks.length){
-      html += `<div class="tasklist"><div class="empty">覚え書きはまだありません。右下の＋から追加できます。</div></div>`;
-    } else {
-      // v3.103: 表示すべきもの（表示期間内。設定していなければ常に対象）から
-      // 先に並べ、重要度（完了型タスクと同じ高/中/無）で並べる。表示期間外の
-      // ものは下に送る。
-      // v3.105: 未設定のものも含め表示期間のキャプションを常に同じ書式で出す
-      // （未設定側は「指定なし」）。表示期間外は薄くするだけでなく、完了型
-      // タスクの4象限のような`.due-head`の見出し「表示期間外」で仕分ける。
-      const remarkRow = r => {
-        const periodLabel = (!r.showFrom && !r.showTo)
-          ? "表示期間: 指定なし"
-          : `表示期間: ${r.showFrom?mdShort(r.showFrom):"指定なし"}〜${r.showTo?mdShort(r.showTo):"指定なし"}`;
-        return `<button class="remark-item${remarkInPeriod(r)?"":" rm-dim"}" data-act="edit-remark" data-id="${r.id}">
-          <span class="rm-text">${esc(r.text)}</span>
-          <div class="rm-meta">
-            ${prioChip(r)}
-            <span class="rm-date">${periodLabel}</span>
-          </div>
-        </button>`;
-      };
-      const items = [...db.remarks].sort(byRemarkShow);
-      const inItems = items.filter(remarkInPeriod);
-      const outItems = items.filter(r=>!remarkInPeriod(r));
-      html += inItems.map(remarkRow).join("");
-      if(outItems.length){
-        html += `<div class="due-head">表示期間外<span>${outItems.length}</span></div>`;
-        html += outItems.map(remarkRow).join("");
-      }
-    }
-  } else if(view === "single"){
+  if(view === "single"){
     // meta row: 重要度 / 開始 / 期限 / カテゴリ を位置固定で並べる（未設定でも左詰めしない）
     // v3.66: ToDoリストのカードと同じメモタブ（タスク自体のメモ＋実施の
     // 進捗メモを1つのトグルで開閉）を2行目に追加。進捗メモは実施
@@ -3224,6 +3192,7 @@ function newNote(){
 }
 
 function renderNotes(){
+  const notesView = state.notesView === "remarks" ? "remarks" : "notes";
   const list = [...(db.notes || [])].sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
   const open = state.noteId ? list.find(n=>n.id===state.noteId) : null;
   if(state.noteId && !open) state.noteId = null;   // it was deleted
@@ -3238,15 +3207,55 @@ function renderNotes(){
     return;
   }
 
-  let html = `<div class="sec-title">メモ${list.length?`（${list.length}）`:""}</div>`;
-  if(!list.length){
-    html += `<div class="empty">メモはまだありません。右下の ＋ から作成できます。</div>`;
+  // v3.162: 覚え書き（db.remarks）はタスクタブの3つ目の切替だったが、
+  // 「もともとあるメモとは別物」として分けていた以前の判断を見直し、
+  // 指示により「覚え書きとメモでタブを分けて」メモタブ内の切替へ統合した。
+  let html = `<div class="seg today-seg">
+    <button class="${notesView==="remarks"?"on":""}" data-act="notes-view" data-v="remarks">覚え書き${db.remarks.length?` <span class="seg-badge">${db.remarks.length}</span>`:""}</button>
+    <button class="${notesView==="notes"?"on":""}" data-act="notes-view" data-v="notes">メモ${list.length?` <span class="seg-badge">${list.length}</span>`:""}</button>
+  </div>`;
+
+  if(notesView === "remarks"){
+    if(!db.remarks.length){
+      html += `<div class="tasklist"><div class="empty">覚え書きはまだありません。右下の＋から追加できます。</div></div>`;
+    } else {
+      // v3.103: 表示すべきもの（表示期間内。設定していなければ常に対象）から
+      // 先に並べ、重要度（完了型タスクと同じ高/中/無）で並べる。表示期間外の
+      // ものは下に送る。
+      // v3.105: 未設定のものも含め表示期間のキャプションを常に同じ書式で出す
+      // （未設定側は「指定なし」）。表示期間外は薄くするだけでなく、完了型
+      // タスクの4象限のような`.due-head`の見出し「表示期間外」で仕分ける。
+      const remarkRow = r => {
+        const periodLabel = (!r.showFrom && !r.showTo)
+          ? "表示期間: 指定なし"
+          : `表示期間: ${r.showFrom?mdShort(r.showFrom):"指定なし"}〜${r.showTo?mdShort(r.showTo):"指定なし"}`;
+        return `<button class="remark-item${remarkInPeriod(r)?"":" rm-dim"}" data-act="edit-remark" data-id="${r.id}">
+          <span class="rm-text">${esc(r.text)}</span>
+          <div class="rm-meta">
+            ${prioChip(r)}
+            <span class="rm-date">${periodLabel}</span>
+          </div>
+        </button>`;
+      };
+      const items = [...db.remarks].sort(byRemarkShow);
+      const inItems = items.filter(remarkInPeriod);
+      const outItems = items.filter(r=>!remarkInPeriod(r));
+      html += inItems.map(remarkRow).join("");
+      if(outItems.length){
+        html += `<div class="due-head">表示期間外<span>${outItems.length}</span></div>`;
+        html += outItems.map(remarkRow).join("");
+      }
+    }
   } else {
-    html += list.map(n=>`<button class="note-item" data-act="open-note" data-id="${n.id}">
-      <div class="nt-title">${esc(noteTitle(n))}</div>
-      ${notePreview(n) ? `<div class="nt-prev">${esc(notePreview(n))}</div>` : ""}
-      <div class="nt-date">${esc(fmtWhen(n.updatedAt))}</div>
-    </button>`).join("");
+    if(!list.length){
+      html += `<div class="empty">メモはまだありません。右下の ＋ から作成できます。</div>`;
+    } else {
+      html += list.map(n=>`<button class="note-item" data-act="open-note" data-id="${n.id}">
+        <div class="nt-title">${esc(noteTitle(n))}</div>
+        ${notePreview(n) ? `<div class="nt-prev">${esc(notePreview(n))}</div>` : ""}
+        <div class="nt-date">${esc(fmtWhen(n.updatedAt))}</div>
+      </button>`).join("");
+    }
   }
   M.innerHTML = html;
 }
@@ -3718,7 +3727,8 @@ function sheetAddOcc(taskId){
 }
 
 /* -- 単発の予定（その時間なにをしているかの表示。チェックなし・その日だけ） -- */
-/* -- 覚え書き（タスクタブの3つ目の切替から。メモ（db.notes）とは別の
+/* -- 覚え書き（メモタブ内の切替から。v3.97〜v3.161はタスクタブの3つ目の
+   切替だったが、v3.162でメモタブへ統合。メモ（db.notes）とは別の
    独立したデータ db.remarks を持つ——「明確に継続するわけでも単発でも
    ないが、意識しておきたいこと」用の短いテキスト1本だけのシンプルな
    項目。タイトル欄はなく、一覧では常に全文が見える）
@@ -4070,6 +4080,7 @@ document.addEventListener("click", e=>{
       break;
     }
     case "tasks-view": { state.tasksView = v; render(); M.scrollTop = 0; break; }
+    case "notes-view": { state.notesView = v; render(); M.scrollTop = 0; break; }
     case "task-sort": { state.taskSort = v; render(); break; }
     case "edit-day": state.tab = "today"; state.date = v; render(); M.scrollTop = 0; break;
     case "go-settings": state.tab="settings"; render(); M.scrollTop=0; break;
@@ -4833,14 +4844,14 @@ function openFab(){
 }
 function closeFab(){ FABM.hidden = true; const s=FAB.querySelector("svg"); if(s) s.style.transform=""; }
 FAB.addEventListener("click", ()=>{
-  // v3.97: 「覚え書き」はタスクタブの3つ目の切替（完了型／継続型／覚え書き）
-  // なので、タスクタブのFABはその時点のサブビューで振り分ける。
-  if(state.tab==="tasks"){
+  if(state.tab==="tasks"){ closeFab(); sheetTask(null); return; }
+  // v3.162: 「覚え書き」はメモタブ内の切替に統合したので、メモタブの
+  // FABもその時点のサブビュー（覚え書き／メモ）で振り分ける。
+  if(state.tab==="notes"){
     closeFab();
-    if(state.tasksView==="remarks") sheetRemark(null); else sheetTask(null);
+    if(state.notesView==="remarks") sheetRemark(null); else newNote();
     return;
   }
-  if(state.tab==="notes"){ closeFab(); newNote(); return; }         // メモタブ: 新規メモ
   FABM.hidden ? openFab() : closeFab();
 });
 FAB.querySelector("svg").style.transition = "transform .18s";

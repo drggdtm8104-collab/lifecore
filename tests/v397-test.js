@@ -117,12 +117,18 @@ ok("db.remarks is an array after boot", Array.isArray(T.db.remarks));
 ok("db.remarks has seeded sample item", T.db.remarks.length >= 1);
 ok("db.notes does not have pinned field on any item", !T.db.notes.some(n=>"pinned" in n));
 
-// -------- Test 2: renderTasks default view is single, remarks not visible until switched --------
+// -------- Test 2: v3.162で「覚え書き」はタスクタブからメモタブへ移動した。
+// タスクタブには出ず、メモタブ側に出ることを確認する。 --------
 T.state.tab = "tasks";
 T.state.tasksView = "single";
 T.render();
 ok("M.innerHTML mentions 完了型タスク seg button", M.innerHTML.includes("完了型タスク"));
-ok("M.innerHTML mentions 覚え書き seg button", M.innerHTML.includes("覚え書き"));
+ok("タスクタブには 覚え書き seg button が無い(メモタブへ移動済み)", !M.innerHTML.includes("覚え書き"));
+
+T.state.tab = "notes";
+T.state.notesView = "notes";
+T.render();
+ok("メモタブに 覚え書き seg button がある", M.innerHTML.includes("覚え書き"));
 
 // -------- Test 3: switch to remarks view via document click dispatch --------
 // simulate case-switch handler directly by finding the click listeners
@@ -149,8 +155,8 @@ function fakeTarget(dataAct, dataV, dataId){
   return t;
 }
 
-dispatchClick(fakeTarget("tasks-view","remarks"));
-ok("state.tasksView becomes 'remarks' after clicking seg button", T.state.tasksView === "remarks");
+dispatchClick(fakeTarget("notes-view","remarks"));
+ok("state.notesView becomes 'remarks' after clicking seg button", T.state.notesView === "remarks");
 T.render();
 ok("remarks view lists seeded remark text", M.innerHTML.includes("常に継続でも単発でもない"));
 ok("remark rendered as button with edit-remark data-act", M.innerHTML.includes('data-act="edit-remark"'));
@@ -180,24 +186,26 @@ vm.runInContext(`
 dispatchClick(fakeTarget("del-remark", null, targetId));
 ok("db.remarks shrank by 1 after del-remark", T.db.remarks.length === countBeforeDel - 1);
 
-// -------- Test 7: FAB routes to sheetRemark when tasksView is remarks --------
+// -------- Test 7: v3.162で「覚え書き」はメモタブへ移動したので、
+// FABもメモタブ・notesView=remarksの時にsheetRemarkへ振り分ける。 --------
 let sheetOpenedWith = null;
 vm.runInContext(`
   sheetRemark = function(id){ globalThis.__sheetRemarkCalledWith = id; };
   sheetTask = function(id){ globalThis.__sheetTaskCalledWith = id; };
+  newNote = function(){ globalThis.__newNoteCalled = true; };
 `, sandbox);
-T.state.tab = "tasks";
-T.state.tasksView = "remarks";
+T.state.tab = "notes";
+T.state.notesView = "remarks";
 const fabHandlers = FAB.__listeners["click"] || [];
 fabHandlers.forEach(fn=>fn({}));
 vm.runInContext(`globalThis.__check1 = (typeof __sheetRemarkCalledWith !== "undefined");`, sandbox);
-ok("sheetRemark was invoked by FAB", sandbox.__check1 === true);
+ok("sheetRemark was invoked by FAB (notes tab, notesView=remarks)", sandbox.__check1 === true);
 
-T.state.tasksView = "single";
+T.state.tab = "tasks";
 vm.runInContext(`delete globalThis.__sheetTaskCalledWith;`, sandbox);
 fabHandlers.forEach(fn=>fn({}));
 vm.runInContext(`globalThis.__check2 = (typeof __sheetTaskCalledWith !== "undefined");`, sandbox);
-ok("sheetTask was invoked by FAB when tasksView=single", sandbox.__check2 === true);
+ok("sheetTask was invoked by FAB on the tasks tab (no longer split by remarks)", sandbox.__check2 === true);
 
 // -------- Test 8: no toast on boot for sample data (dbg used instead) --------
 // We can't easily re-run boot here, but verify the source no longer calls toast(...) inside the localIsSample branch.
