@@ -850,11 +850,13 @@
   .time-row .tr-sep{flex:none;color:var(--faint);font-size:12px}
   /* v3.158: 開始・終了を別行に分け、両脇に±1分・±5分ボタンを置くレイアウト
      （タスクの時間編集・予定編集・ToDo追加時の時間入力で使用）。 */
-  .time-stepper-row{display:flex;gap:6px;align-items:center;margin-top:6px}
+  .time-stepper-row{display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
   .time-stepper-row .ts-label{flex:none;width:34px;font-size:11.5px;color:var(--muted)}
+  /* v3.159: 時刻入力は元の.time-rowと同じ固定サイズ・左詰めに戻した
+     （以前はflex:1で幅いっぱいに伸ばしていたが、指示により元のサイズへ）。 */
   .time-stepper-row input[type="time"]{
-    flex:1;min-width:0;height:38px;min-height:38px;padding:0 6px;
-    box-sizing:border-box;font-family:var(--font-mono);text-align:center;
+    flex:none;height:38px;min-height:38px;width:82px;padding:0 6px;
+    box-sizing:border-box;font-family:var(--font-mono);
   }
   .ts-btn{
     flex:none;width:34px;height:34px;border-radius:9px;
@@ -1047,7 +1049,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.158";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.159";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1225,14 +1227,18 @@ const settings = () => (db.settings || (db.settings = { showOutlook:true }));
 // （ネイティブピッカーで大まかに合わせてから、ボタンで細かく微調整する
 // 使い方を想定）。所要時間の手入力欄も、ほぼ使われていないとのことなので
 // 同時に廃止し、開始・終了から自動で算出する一本化にした。
-function timeRow(label, inputId, value, clearAct){
+// v3.159: 時刻入力は元の固定サイズに戻し左側に置く。調整ボタンは
+// その右へ4つまとめて並べる（-5/-1/+1/+5の順）。extraHTMLで、終了側の
+// 行にだけ「クリア」ボタンを同じ行に収める。
+function timeRow(label, inputId, value, extraHTML){
   return `<div class="time-stepper-row">
     <span class="ts-label">${esc(label)}</span>
+    <input type="time" id="${inputId}" value="${esc(value||"")}">
     <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="-5">−5</button>
     <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="-1">−1</button>
-    <input type="time" id="${inputId}" value="${esc(value||"")}">
     <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="1">+1</button>
     <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="5">+5</button>
+    ${extraHTML||""}
   </div>`;
 }
 
@@ -3680,8 +3686,7 @@ function sheetAddOcc(taskId){
     <p class="sheet-sub">開始時刻を入れると時間割に置かれます。空欄なら「時間未定」で追加。</p>
     <label class="fld"><span>開始 〜 終了（空欄可）</span></label>
     ${timeRow("開始", "aoStart", "")}
-    ${timeRow("終了", "aoEnd", "")}
-    <button type="button" class="mini-clear" data-act="ao-clear-time">クリア</button>
+    ${timeRow("終了", "aoEnd", "", '<button type="button" class="mini-clear" data-act="ao-clear-time">クリア</button>')}
     <div class="sheet-actions">
       <button class="btn ghost" data-act="close-sheet">キャンセル</button>
       <button class="btn primary" data-act="add-today" data-id="${taskId}">タスクを追加</button>
@@ -3805,9 +3810,8 @@ function sheetMarker(id){
     <label class="fld"><span>内容</span><input type="text" id="mkName" value="${esc(m?.title||"")}" placeholder="例: 美容院"></label>
     <label class="fld"><span>開始 〜 終了（空欄可）</span></label>
     ${timeRow("開始", "mkStart", m?.plannedStart||"")}
-    ${timeRow("終了", "mkEnd", curEnd)}
-    <p class="sheet-sub" style="margin-top:2px">両方空欄なら「時点」の予定。
-      <button type="button" class="mini-clear" data-act="mk-clear-span">終了をなしにする</button></p>
+    ${timeRow("終了", "mkEnd", curEnd, '<button type="button" class="mini-clear" data-act="mk-clear-span">クリア</button>')}
+    <p class="sheet-sub" style="margin-top:2px">両方空欄なら「時点」の予定。</p>
     <label class="fld"><span>カテゴリ</span></label>
     <div class="radio-row" id="mkCat">
       ${CATS.map(c=>`<button data-v="${c}" class="${curCat===c?"on":""}">${c}</button>`).join("")}
@@ -3842,8 +3846,7 @@ function sheetOccEdit(id){
       : `<p class="sheet-sub">タスク: ${esc(t?.name || "(削除済み)")}</p>`}
     <label class="fld"><span>開始 〜 終了（開始は空欄可）</span></label>
     ${timeRow("開始", "oeStart", o.plannedStart||"")}
-    ${timeRow("終了", "oeEnd", curEnd)}
-    <button type="button" class="mini-clear" data-act="oe-clear-span">クリア</button>
+    ${timeRow("終了", "oeEnd", curEnd, '<button type="button" class="mini-clear" data-act="oe-clear-span">クリア</button>')}
     <p class="sheet-sub" style="margin-top:2px">全部空欄なら「時間未定」になる。</p>
     ${t ? `<label class="fld"><span>備考（任意・タスクの説明）</span>${noteTextarea("oeTaskNote", t.note, "手順・持ち物・詳細など")}</label>` : ""}
     <label class="fld"><span>進捗メモ（任意）</span>${noteTextarea("oeNote", o.note, "例: 第3章まで／下書きだけ・補足など")}</label>
