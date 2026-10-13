@@ -1049,7 +1049,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.161";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.162";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3475,13 +3475,18 @@ function renderSettings(){
   // クラウドに届かずClaudeから見えない——判明した実機の制約。同期できる
   // 側（Artifact版）へワンタップで飛べるリンクを、同期できない時だけ
   // 出す（#devmemoハッシュで着地後、設定タブ・このカードまで自動で開く）。
+  // v3.162: 同期できない側で入力欄自体を出すと「書いたのに届かない」と
+  // いう紛らわしさの元になる（実際に起きた）ため、入力欄・クリアボタンは
+  // 同期できる時だけ出し、同期できない時は説明文＋リンクのみにする。
   const canSyncDevMemo = !!(window.claude && window.claude.use);
   html += setCard("devmemo", "開発メモ（お試し）", ()=>
-    `<p>Claudeへの開発指示を書いておくための専用メモです。他のメモ・覚え書きとは別に保存されます。指示として使い終わったら「クリア」で消してください。</p>
-     ${canSyncDevMemo ? "" : `<p class="sheet-sub" style="color:var(--over)">この開き方（ホーム画面など）だと同期されずClaudeに届きません。↓のリンクから開いて書いてください。</p>
-     <a class="btn primary" style="width:100%;text-decoration:none;display:block;text-align:center;margin-bottom:8px" target="_blank" rel="noopener" href="https://claude.ai/artifact/6JXB1Ztzkj5h9rnHmd49rf#devmemo">同期できる版を開く ↗</a>`}
-     <textarea class="io" id="devMemoArea" placeholder="例: ◯◯の不具合を直して、など">${esc(settings().devMemo||"")}</textarea>
-     <div style="margin-top:8px"><button class="btn ghost" style="color:var(--over)" data-act="clear-dev-memo">クリア</button></div>`);
+    canSyncDevMemo
+      ? `<p>Claudeへの開発指示を書いておくための専用メモです。他のメモ・覚え書きとは別に保存されます。指示として使い終わったら「クリア」で消してください。</p>
+         <textarea class="io" id="devMemoArea" placeholder="例: ◯◯の不具合を直して、など">${esc(settings().devMemo||"")}</textarea>
+         <div style="margin-top:8px"><button class="btn ghost" style="color:var(--over)" data-act="clear-dev-memo">クリア</button></div>`
+      : `<p>Claudeへの開発指示を書いておくための専用メモです。</p>
+         <p class="sheet-sub" style="color:var(--over)">この開き方（ホーム画面など）だと同期されずClaudeに届かないため、ここには入力欄を出していません。↓のリンクから開いて書いてください。</p>
+         <a class="btn primary" style="width:100%;text-decoration:none;display:block;text-align:center" target="_blank" rel="noopener" href="https://claude.ai/artifact/6JXB1Ztzkj5h9rnHmd49rf#devmemo">同期できる版を開く ↗</a>`);
 
   html += setCard("reset", "リセット", ()=>
     `<p>「記録をリセット」はタスク・実施・履歴だけを消し、<strong>テンプレートと設定は残します</strong>。「すべて初期化」はテンプレートも含めて出荷状態に戻します。</p>

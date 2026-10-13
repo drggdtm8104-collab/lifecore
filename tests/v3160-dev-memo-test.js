@@ -111,18 +111,28 @@ ok("typing into devMemoArea updates settings().devMemo immediately", T.settings(
 dispatchClick("clear-dev-memo");
 ok("clear-dev-memo empties settings().devMemo", T.settings().devMemo === "");
 
-// v3.160-4: 設定画面のレンダリングに、devMemoAreaとクリアボタンが
-// 正しく出る（他のメモ一覧とは別の専用カードとして）。
+// v3.162: window.claudeが無い(=このテストsandboxのデフォルト状態、
+// GitHub Pages版相当)ときは、入力欄・クリアボタンは出さず、説明文と
+// 同期できる版へのリンクだけを出す(「書いたのに届かない」混乱を防ぐため)。
 {
   T.settings().devMemo = "テスト用の指示メモ";
   dispatchClick("toggle-set", { v:"devmemo" });   // カードを開く（設定カードはデフォルト折りたたみ）
   T.renderSettings();
   const html = elStore.main.innerHTML;
-  ok("renders a textarea with id devMemoArea containing the current value", html.includes('id="devMemoArea"') && html.includes(">テスト用の指示メモ<"));
-  ok("renders a クリア button pointed at clear-dev-memo", html.includes('data-act="clear-dev-memo"') && html.includes(">クリア<"));
-  // v3.161: window.claudeが無い(=このテストsandboxのデフォルト状態、
-  // GitHub Pages版相当)ときは、同期できる版を開くリンクが出る。
+  ok("does NOT render the textarea when window.claude is unavailable", !html.includes('id="devMemoArea"'));
+  ok("does NOT render the クリア button when window.claude is unavailable", !html.includes('data-act="clear-dev-memo"'));
   ok("shows the 'open the syncable version' link when window.claude is unavailable", html.includes('href="https://claude.ai/artifact/6JXB1Ztzkj5h9rnHmd49rf#devmemo"'));
+}
+
+// v3.162-2: window.claudeがある(=同期できる、Artifact版相当)ときは、
+// 逆にリンクではなく入力欄・クリアボタンが出る。
+{
+  sandbox.claude = { use: async()=>({}) };   // window===sandbox なので window.claude 相当
+  T.renderSettings();
+  const html = elStore.main.innerHTML;
+  ok("renders the textarea when window.claude IS available", html.includes('id="devMemoArea"') && html.includes(">テスト用の指示メモ<"));
+  ok("renders the クリア button when window.claude IS available", html.includes('data-act="clear-dev-memo"'));
+  ok("does NOT show the link when window.claude IS available", !html.includes('href="https://claude.ai/artifact/6JXB1Ztzkj5h9rnHmd49rf#devmemo"'));
 }
 
 // v3.161: #devmemoハッシュで着地した場合、設定タブ・開発メモのカードが
