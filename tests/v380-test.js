@@ -1,6 +1,7 @@
 const fs = require("fs");
+const path = require("path");
 const vm = require("vm");
-const src = fs.readFileSync("C:\\Users\\hirom\\AppData\\Local\\Temp\\claude\\C--Users-hirom-Claude-LifeCore\\40dba0f7-d9f0-41be-aea7-13fea80b52f2\\scratchpad\\app.js", "utf8");
+const src = fs.readFileSync(path.join(__dirname, "app.js"), "utf8");
 function mkEl(){
   const el = { dataset:{}, style:{}, value:"", classList:{add(){},remove(){},toggle(){},contains(){return false;}},
     addEventListener(){}, appendChild(){}, querySelector(){return mkEl();}, querySelectorAll(){return [];}, closest(){return null;}, focus(){}, scrollIntoView(){} };
@@ -21,6 +22,7 @@ const sandbox = {
   localStorage:{ getItem(k){return store[k]||null;}, setItem(k,v){store[k]=String(v);}, removeItem(k){delete store[k];} },
   navigator:{clipboard:{writeText:async()=>{}}},
   crypto:{randomUUID:()=>"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"},
+  location: { hash:"", search:"", href:"http://localhost/" },
   console, setTimeout, clearTimeout, setInterval, clearInterval, Date,
 };
 sandbox.document.documentElement = mkEl();
@@ -41,30 +43,25 @@ vm.runInContext(`state.tab = "settings";`, sandbox);
 vm.runInContext(`renderSettings()`, sandbox);
 let html = sandbox.document.getElementById("main").innerHTML;
 
-check(html.includes('data-act="toggle-set" data-v="outlook"'), "今日の見通しが折りたたみヘッダー（他と同じ仕組み）になっている");
-check(!html.includes('data-act="toggle-outlook"'), "デフォルトでは折りたたまれていて中のボタンは見えない");
+check(html.includes('data-act="toggle-set" data-v="export"'), "バックアップ（書き出し）が折りたたみヘッダー（他と同じ仕組み）になっている");
+check(!html.includes('data-act="copy-export"'), "デフォルトでは折りたたまれていて中のボタンは見えない");
 
 // open it
-dispatchClick(mkBtn({ act:"toggle-set", v:"outlook" }));
+dispatchClick(mkBtn({ act:"toggle-set", v:"export" }));
 vm.runInContext(`renderSettings()`, sandbox);
 html = sandbox.document.getElementById("main").innerHTML;
-check(html.includes('data-act="toggle-outlook"'), "開くと中の表示切り替えボタンが見える");
-check(html.includes('▼今日の見通し') || html.includes('▼</span>今日の見通し'), "開いた状態で▼になる");
-
-// the inner button still works
-dispatchClick(mkBtn({ act:"toggle-outlook" }));
-const showOutlook = vm.runInContext(`settings().showOutlook`, sandbox);
-check(showOutlook === false, "中のボタンを押すと showOutlook がトグルされる（従来通り機能する）");
+check(html.includes('data-act="copy-export"'), "開くと中のボタンが見える");
+check(html.includes('▼バックアップ（書き出し）') || html.includes('▼</span>バックアップ（書き出し）'), "開いた状態で▼になる");
 
 // close it again
-dispatchClick(mkBtn({ act:"toggle-set", v:"outlook" }));
+dispatchClick(mkBtn({ act:"toggle-set", v:"export" }));
 vm.runInContext(`renderSettings()`, sandbox);
 html = sandbox.document.getElementById("main").innerHTML;
-check(!html.includes('data-act="toggle-outlook"'), "もう一度押すと閉じる");
+check(!html.includes('data-act="copy-export"'), "もう一度押すと閉じる");
 
-// regression: other setCard sections still work (spot check "export";
-// v3.165で「同期・保存先」カード自体を削除したため、別のカードに変更)
-check(html.includes('data-act="toggle-set" data-v="export"'), "バックアップ（書き出し）の折りたたみも引き続き存在する（回帰なし）");
+// regression: other setCard sections still work (spot check "devmemo";
+// v3.166で「今日の見通し」カード自体を削除したため、別のカードに変更)
+check(html.includes('data-act="toggle-set" data-v="devmemo"'), "開発メモの折りたたみも引き続き存在する（回帰なし）");
 
 console.log(ok ? "\nALL PASS" : "\nSOME FAILED");
 process.exit(ok?0:1);

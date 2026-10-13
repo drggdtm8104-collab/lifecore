@@ -508,21 +508,6 @@
   }
   @keyframes toastin{from{opacity:0;transform:translate(-50%,6px)}to{opacity:1;transform:translate(-50%,0)}}
 
-  /* ---------- today outlook ---------- */
-  .outlook{
-    border:1px solid var(--hairline);border-radius:12px;background:var(--surface);
-    box-shadow:var(--shadow);padding:10px 12px;margin-top:10px;
-  }
-  .outlook .ol-head{display:flex;align-items:center;gap:7px;font-weight:600;font-size:12px}
-  .outlook .ol-dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--defer)}
-  .outlook .ol-dot.ok{background:var(--done)}
-  .outlook .ol-dot.tight{background:var(--partial)}
-  .outlook .ol-dot.over{background:var(--over)}
-  .outlook .ol-text{font-size:11.5px;color:var(--muted);margin-top:4px}
-  .outlook .ol-risk{font-size:11.5px;color:var(--ink);margin-top:6px;padding-left:12px;position:relative;line-height:1.5}
-  .outlook .ol-risk::before{content:"›";position:absolute;left:2px;color:var(--primary)}
-  .outlook .acts{margin-top:9px}
-
   /* ---------- insights (傾向) ---------- */
   .ins-intro{font-size:11.5px;color:var(--muted);margin:8px 2px 0}
   .ins-card{
@@ -1049,7 +1034,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.165";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.166";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1208,7 +1193,7 @@ function loadLocal(){
     if(raw){
       try{
         const d = JSON.parse(raw);
-        if(!d.settings) d.settings = { showOutlook:true };
+        if(!d.settings) d.settings = {};
         return migrate(d);
       }catch(e){
         console.warn("local parse/migrate failed — falling back to sample", e);
@@ -1219,7 +1204,7 @@ function loadLocal(){
   }catch(e){ console.warn("local load failed", e); }
   return migrate(seed());
 }
-const settings = () => (db.settings || (db.settings = { showOutlook:true }));
+const settings = () => (db.settings || (db.settings = {}));
 // v3.158: v3.157のstep属性トグルは、iOS Safariのネイティブ時刻ピッカーが
 // step属性をピッカーUI自体には反映しない（フォーム検証にしか使わない）
 // ことが判明したため撤去。代わりに、開始・終了を別の行に分け、それぞれの
@@ -1385,7 +1370,7 @@ function splitToDocs(d){
   const core = {
     version: d.version || 1,
     meta: d.meta || {},
-    settings: d.settings || { showOutlook:true },
+    settings: d.settings || {},
     templates: d.templates || [],
     tasks: d.tasks || [],
     notes: d.notes || [],
@@ -1410,7 +1395,7 @@ function rebuildFromDocs(core, monthDocs){
   const d = {
     version: core.version || 1,
     meta: core.meta || {},
-    settings: core.settings || { showOutlook:true },
+    settings: core.settings || {},
     templates: core.templates || [],
     tasks: core.tasks || [],
     notes: core.notes || [],
@@ -1461,7 +1446,7 @@ const mergeById = (localArr, cloudArr) => {
 const mergeDb = (local, cloud) => ({
   version: cloud.version || local.version || 1,
   meta: cloud.meta || local.meta || {},
-  settings: cloud.settings || local.settings || { showOutlook:true },
+  settings: cloud.settings || local.settings || {},
   templates: mergeById(local.templates, cloud.templates),
   tasks: mergeById(local.tasks, cloud.tasks),
   notes: mergeById(local.notes, cloud.notes),
@@ -1844,7 +1829,7 @@ function seed(){
   ];
 
   return { version:1, meta:{ seeded:true, sample:true },
-           settings:{ showOutlook:true },
+           settings:{},
            templates, tasks, notes, remarks, occurrences:occ, dayMeta };
 }
 
@@ -2159,47 +2144,6 @@ function analyze(){
   return { daysTracked, capacityMin, capacityCnt, estBias, hourScores, weekdayScores, overallRate, chronic, repeatDay };
 }
 
-/* today's outlook — will the plan hold? */
-function todayOutlook(profile){
-  const d = state.date;
-  const occ = occsOn(d).filter(o=>!o.plan);
-  const pending = occ.filter(o=>o.status==="planned");
-  const doneMin = occ.filter(o=>o.status==="done").reduce((s,o)=>s+(o.actualMin||0),0);
-  const pendMin = pending.reduce((s,o)=>s+(o.plannedMin || taskOf(o)?.estMin || 0),0);
-  const projected = doneMin + pendMin;
-
-  let verdict = null;
-  if(profile.capacityMin!=null && pending.length){
-    const r = projected / Math.max(profile.capacityMin,1);
-    if(r >= 1.4)      verdict = { level:"over",  text:`今日の予定は約 ${projected}分。普段こなせているのは約 ${profile.capacityMin}分です。` };
-    else if(r >= 1.1) verdict = { level:"tight", text:`今日の予定は約 ${projected}分。普段（約 ${profile.capacityMin}分）よりやや多めです。` };
-    else             verdict = { level:"ok",    text:`今日の予定は約 ${projected}分。普段の範囲（約 ${profile.capacityMin}分）に収まっています。` };
-  }
-
-  const risks = [];
-  pending.forEach(o=>{
-    if(o.plannedStart){
-      const hs = profile.hourScores.find(x=>x.b===bucketOf(o.plannedStart));
-      if(hs && hs.rate < 0.5)
-        risks.push(`${o.plannedStart} の時間帯はこれまで達成率 ${Math.round(hs.rate*100)}%。「${occName(o)}」は前倒しできる?`);
-    }
-    const cat = occCat(o);
-    const eb = profile.estBias.find(x=>x.cat===cat);
-    if(eb && eb.ratio >= 1.25){
-      const p = o.plannedMin || taskOf(o)?.estMin || 0;
-      risks.push(`「${cat}」は見積もりの約 ${eb.ratio.toFixed(1)} 倍かかりがち。「${occName(o)}」は ${p}分 → ${Math.round(p*eb.ratio/5)*5}分 で見ておくと安全。`);
-    }
-  });
-
-  // heaviest pending task to move, if overloaded
-  let moveable = null;
-  if(verdict && verdict.level==="over"){
-    moveable = pending.filter(o=>o.taskId).sort((a,b)=>
-      (b.plannedMin||taskOf(b)?.estMin||0) - (a.plannedMin||taskOf(a)?.estMin||0))[0] || null;
-  }
-  return { verdict, risks:risks.slice(0,3), moveable, projected };
-}
-
 /* ---------- template application ----------
    v3.49: 適用は「コピーして一から追加した」のと同じ状態にする（テンプレへの
    ライブ同期ではない）。予定（tpl.plans）・タスク配置（tpl.tasks）のどちらも、
@@ -2479,23 +2423,6 @@ function renderToday(){
 
   if(db.meta && db.meta.sample){
     html += `<div class="banner">サンプルデータで表示中です。<button data-act="clear-sample">消して始める</button></div>`;
-  }
-
-  // schedule outlook — only for today ("will today's plan hold?")
-  if(isToday && settings().showOutlook !== false){
-    const ol = todayOutlook(analyze());
-    if(ol.verdict || ol.risks.length){
-      html += `<div class="outlook">`;
-      if(ol.verdict){
-        const jp = {ok:"収まっています",tight:"やや多め",over:"過負荷ぎみ"}[ol.verdict.level];
-        html += `<div class="ol-head"><span class="ol-dot ${ol.verdict.level}"></span>今日の見通し — ${jp}</div>
-          <div class="ol-text">${esc(ol.verdict.text)}</div>`;
-      } else {
-        html += `<div class="ol-head"><span class="ol-dot tight"></span>今日の見通し</div>`;
-      }
-      ol.risks.forEach(r=> html += `<div class="ol-risk">${esc(r)}</div>`);
-      html += `</div>`;
-    }
   }
 
   const occ = occsOn(d);
@@ -3056,7 +2983,7 @@ function insightsHTML(){
   if(p.capacityMin!=null){
     html += `<div class="ins-card"><h3>1日にこなせる量</h3>
       <p>実際にこなせているのは <strong>だいたい ${p.capacityMin}分 / ${Math.round(p.capacityCnt)}件</strong>（記録のある ${p.daysTracked}日の中央値）。</p>
-      <p class="ins-note">今日の予定がこれを大きく超えていると、後半が崩れやすくなります。「今日」画面の見通しでも表示されます。</p></div>`;
+      <p class="ins-note">今日の予定がこれを大きく超えていると、後半が崩れやすくなります。</p></div>`;
   }
 
   // 2. time-of-day reliability
@@ -3120,7 +3047,6 @@ function insightsHTML(){
     html += `<p class="ins-note">この曜日にあらかじめ置いておくと、頻度を満たしやすくなります。</p></div>`;
   }
 
-  html += `<p class="ins-intro" style="margin-top:16px">「今日」画面の見通しカードは 設定 → 「今日の見通しを表示」で切り替えられます。</p>`;
   return html;
 }
 
@@ -3364,10 +3290,6 @@ function renderSettings(){
          `<button class="${(THEMES.includes(settings().theme)?settings().theme:"dark")===v?"on":""}" data-act="set-theme" data-v="${v}">${l}</button>`).join("")}
      </div>`);
 
-  html += setCard("outlook", "今日の見通し", ()=>
-    `<p>「今日」画面の上部に、その日の予定量が普段こなせる量に収まっているか・崩れやすい時間帯かを表示します。傾向タブの学習結果を使います。</p>
-     <button class="btn ${settings().showOutlook!==false?"primary":""}" data-act="toggle-outlook">${settings().showOutlook!==false?"表示中（タップでオフ）":"非表示（タップでオン）"}</button>`);
-
   // v3.118: プッシュ通知。時間が決まっているタスクについて、その時刻に
   // なったらタスクごとに個別に通知を送る。オンにしている間だけ、対象
   // タスクの名前・時刻（内容・メモなどは含まない）を通知サーバーに
@@ -3390,6 +3312,33 @@ function renderSettings(){
   // 裏側の送信）やlocalSaveOkの保存失敗トースト（v3.58〜）はこのカードと
   // 無関係に動き続けるので、削除してもそれらの機能は失われない。
 
+  // v3.160: Claudeへの開発指示を書いておくための専用メモ（v3.164で
+  // 実際にArtifact版経由の指示を試し、正常に動くことを確認したため
+  // 本実装として確定——「お試し」のラベルは外した）。
+  // 他のメモ（db.notes）・覚え書き（db.remarks）とは別物として、
+  // settings().devMemoという単独の文字列フィールドに持たせる——既存の
+  // settingsの同期経路（core/main）にそのまま乗るので、新しい同期の
+  // 仕組みを増やす必要がない。使ったら自分で「クリア」で消す運用
+  // （Claude側が直接クラウドのデータを書き換えるのは、アプリ自身の同期
+  // ロジックと競合する危険があるため避ける）。
+  // v3.161: GitHub Pages版（window.claude無し）では、ここに書いても
+  // クラウドに届かずClaudeから見えない——判明した実機の制約。同期できる
+  // 側（Artifact版）へワンタップで飛べるリンクを、同期できない時だけ
+  // 出す（#devmemoハッシュで着地後、設定タブ・このカードまで自動で開く）。
+  // v3.162: 同期できない側で入力欄自体を出すと「書いたのに届かない」と
+  // いう紛らわしさの元になる（実際に起きた）ため、入力欄・クリアボタンは
+  // 同期できる時だけ出し、同期できない時は説明文＋リンクのみにする。
+  // v3.166: 開発メモはバックアップより上に表示（指示により並び順変更）。
+  const canSyncDevMemo = !!(window.claude && window.claude.use);
+  html += setCard("devmemo", "開発メモ", ()=>
+    canSyncDevMemo
+      ? `<p>Claudeへの開発指示を書いておくための専用メモです。他のメモ・覚え書きとは別に保存されます。指示として使い終わったら「クリア」で消してください。</p>
+         <textarea class="io" id="devMemoArea" placeholder="例: ◯◯の不具合を直して、など">${esc(settings().devMemo||"")}</textarea>
+         <div style="margin-top:8px"><button class="btn ghost" style="color:var(--over)" data-act="clear-dev-memo">クリア</button></div>`
+      : `<p>Claudeへの開発指示を書いておくための専用メモです。</p>
+         <p class="sheet-sub" style="color:var(--over)">この開き方（ホーム画面など）だと同期されずClaudeに届かないため、ここには入力欄を出していません。↓のリンクから開いて書いてください。</p>
+         <a class="btn primary" style="width:100%;text-decoration:none;display:block;text-align:center" target="_blank" rel="noopener" href="https://claude.ai/artifact/6JXB1Ztzkj5h9rnHmd49rf#devmemo">同期できる版を開く ↗</a>`);
+
   html += setCard("export", "バックアップ（書き出し）", ()=>
     `<p>下のテキストをコピーするか、ファイルとして保存してください。同期が無効な状態でブラウザのデータを消すと記録は失われます。定期的な控えを推奨。</p>
      <textarea class="io" id="exportBox" readonly>${esc(JSON.stringify(db))}</textarea>
@@ -3398,7 +3347,7 @@ function renderSettings(){
        <button class="btn ghost" data-act="download-export">ファイルとして保存</button>
      </div>`);
 
-  html += setCard("import", "読み込み", ()=>
+  html += setCard("import", "バックアップ（読み出し）", ()=>
     `<p>書き出したテキストを貼り付けるか、ファイルを選んで反映します。</p>
      <p class="sheet-sub"><strong>マージ</strong>: この端末とテキスト側、それぞれにしかない項目はどちらも残ります。同じ項目を両方で編集していた場合だけテキスト側が優先されます——他の端末で編集した内容をこの端末にも反映したいとき（v3.107〜）。<br>
      <strong>完全に置き換え</strong>: この端末の内容をすべて消し、テキストの内容だけにします——壊れた・おかしいデータをまっさらに戻したいとき。</p>
@@ -3417,32 +3366,6 @@ function renderSettings(){
     `<p>不具合の切り分け用。同期まわりの動きとエラーが出ます。</p>
      <pre class="io" style="white-space:pre-wrap;min-height:80px">${esc(debugLog.slice(-24).join("\n") || "(なし)")}</pre>
      <div style="margin-top:8px"><button class="btn" data-act="copy-debug">コピー</button></div>`);
-
-  // v3.160: Claudeへの開発指示を書いておくための専用メモ（v3.164で
-  // 実際にArtifact版経由の指示を試し、正常に動くことを確認したため
-  // 本実装として確定——「お試し」のラベルは外した）。
-  // 他のメモ（db.notes）・覚え書き（db.remarks）とは別物として、
-  // settings().devMemoという単独の文字列フィールドに持たせる——既存の
-  // settingsの同期経路（core/main）にそのまま乗るので、新しい同期の
-  // 仕組みを増やす必要がない。使ったら自分で「クリア」で消す運用
-  // （Claude側が直接クラウドのデータを書き換えるのは、アプリ自身の同期
-  // ロジックと競合する危険があるため避ける）。
-  // v3.161: GitHub Pages版（window.claude無し）では、ここに書いても
-  // クラウドに届かずClaudeから見えない——判明した実機の制約。同期できる
-  // 側（Artifact版）へワンタップで飛べるリンクを、同期できない時だけ
-  // 出す（#devmemoハッシュで着地後、設定タブ・このカードまで自動で開く）。
-  // v3.162: 同期できない側で入力欄自体を出すと「書いたのに届かない」と
-  // いう紛らわしさの元になる（実際に起きた）ため、入力欄・クリアボタンは
-  // 同期できる時だけ出し、同期できない時は説明文＋リンクのみにする。
-  const canSyncDevMemo = !!(window.claude && window.claude.use);
-  html += setCard("devmemo", "開発メモ", ()=>
-    canSyncDevMemo
-      ? `<p>Claudeへの開発指示を書いておくための専用メモです。他のメモ・覚え書きとは別に保存されます。指示として使い終わったら「クリア」で消してください。</p>
-         <textarea class="io" id="devMemoArea" placeholder="例: ◯◯の不具合を直して、など">${esc(settings().devMemo||"")}</textarea>
-         <div style="margin-top:8px"><button class="btn ghost" style="color:var(--over)" data-act="clear-dev-memo">クリア</button></div>`
-      : `<p>Claudeへの開発指示を書いておくための専用メモです。</p>
-         <p class="sheet-sub" style="color:var(--over)">この開き方（ホーム画面など）だと同期されずClaudeに届かないため、ここには入力欄を出していません。↓のリンクから開いて書いてください。</p>
-         <a class="btn primary" style="width:100%;text-decoration:none;display:block;text-align:center" target="_blank" rel="noopener" href="https://claude.ai/artifact/6JXB1Ztzkj5h9rnHmd49rf#devmemo">同期できる版を開く ↗</a>`);
 
   html += setCard("reset", "リセット", ()=>
     `<p>「記録をリセット」はタスク・実施・履歴だけを消し、<strong>テンプレートと設定は残します</strong>。「すべて初期化」はテンプレートも含めて出荷状態に戻します。</p>
@@ -4302,7 +4225,6 @@ document.addEventListener("click", e=>{
       state._noteOpen.has(id) ? state._noteOpen.delete(id) : state._noteOpen.add(id);
       render(); break;
     }
-    case "toggle-outlook": settings().showOutlook = (settings().showOutlook===false); save(); render(); break;
     case "clear-dev-memo": settings().devMemo = ""; save(); render(); break;
     case "toggle-tick-labels": settings().hideTimeTicks = (settings().hideTimeTicks !== true); save(); render(); break;
     case "toggle-push": {
@@ -4597,7 +4519,7 @@ document.addEventListener("click", e=>{
         : "現在のデータをこの内容で完全に置き換えます。元に戻せません。";
       askConfirm(msg, ()=>{
         const incoming = migrate(next);
-        if(!incoming.settings) incoming.settings = {showOutlook:true};
+        if(!incoming.settings) incoming.settings = {};
         db = doMerge ? mergeDb(db, incoming) : incoming;
         saveLocal(); resyncFull(); state.tab="today"; render(); toast(doMerge?"マージしました":"読み込みました");
       });

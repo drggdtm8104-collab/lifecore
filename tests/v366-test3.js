@@ -1,6 +1,7 @@
 const fs = require("fs");
+const path = require("path");
 const vm = require("vm");
-const src = fs.readFileSync("C:\\Users\\hirom\\AppData\\Local\\Temp\\claude\\C--Users-hirom-Claude-LifeCore\\40dba0f7-d9f0-41be-aea7-13fea80b52f2\\scratchpad\\app.js", "utf8");
+const src = fs.readFileSync(path.join(__dirname, "app.js"), "utf8");
 
 function mkEl(){
   const el = { dataset:{}, style:{}, value:"", classList:{add(){},remove(){},toggle(){},contains(){return false;}},
@@ -37,6 +38,7 @@ const sandbox = {
   localStorage:{ getItem(k){return store[k]||null;}, setItem(k,v){store[k]=String(v);}, removeItem(k){delete store[k];} },
   navigator:{clipboard:{writeText:async()=>{}}},
   crypto:{randomUUID:()=>"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"},
+  location: { hash:"", search:"", href:"http://localhost/" },
   console, setTimeout, clearTimeout, setInterval, clearInterval, Date,
 };
 sandbox.document.documentElement = mkEl();
