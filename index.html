@@ -1034,7 +1034,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.166";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.167";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -4129,15 +4129,20 @@ document.addEventListener("click", e=>{
     case "toggle-occ-done": {
       const o = db.occurrences.find(x=>x.id===id); if(!o) break;
       const t = taskOf(o);
+      let myQuestType;
       if(o.status==="done"){
         o.status="planned"; o.actualMin=null; o.doneAt=null;
         if(t && t.kind==="single") t.done=false;
+        myQuestType = "task.uncompleted";
       } else {
         o.status="done"; o.doneAt=stamp(o.date);
         if(o.actualMin==null) o.actualMin = o.plannedMin || t?.estMin || 0;
         if(t && t.kind==="single") t.done = true;
+        myQuestType = "task.completed";
       }
-      save(); render(); break;
+      save(); render();
+      sendTaskEvent(o, myQuestType);
+      break;
     }
     // v3.133: 「未達成」ボタン——時間指定の継続型タスクなど、時間を過ぎてから
     // やっても意味がないものに「できなかった」の記録を残す。toggle-occ-done
@@ -4791,6 +4796,23 @@ function todaysTimedTasks(){
     .filter(o => o.date===t && !o.plan && o.status!=="done" && o.plannedStart)
     .map(o => ({ id:o.id, name:occName(o), time:o.plannedStart }))
     .filter(x => x.name);
+}
+
+// v3.167: タスクの完了・取り消しを、別の自作アプリ「MyQuest」へ知らせる連携。
+// MyQuest自体のアクセス合鍵はpush-server（Worker）側だけが持ち、ここ
+// （クライアント側コード）には一切置かない——push-serverの既存の合鍵
+// （PUSH_SHARED_TOKEN）で/task-eventを呼ぶだけで、MyQuestへの中継は
+// Worker側の責務。送信に失敗しても（オフライン等）push-server側が後で
+// 送り直すため、ここでは結果を待たないfire-and-forgetでよい。通知の
+// オン/オフとは無関係に、常に送る。
+function sendTaskEvent(o, type){
+  const task = o.taskId || o.id;
+  const title = occName(o).slice(0, 100);
+  const at = new Date().toISOString();
+  fetch(PUSH_SERVER + "/task-event", {
+    method:"POST", headers:{ "Content-Type":"application/json", "X-LifeCore-Token": PUSH_SHARED_TOKEN },
+    body: JSON.stringify({ id:o.id, type, task, title, at }),
+  }).then(res=>dbg("[myquest] task event:", type, res.status)).catch(e=>dbg("[myquest] task event failed:", e.message));
 }
 
 let pushDigestTimer = null;
