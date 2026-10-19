@@ -1034,7 +1034,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.167";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.168";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2836,6 +2836,15 @@ function renderTasks(){
     // いた（ユーザーの指摘による）。
   } else {
     const T = todayStr();
+    // v3.168: 継続型タスクにも、完了型と同じ「メモ▼」でタスク自体のメモ＋
+    // 最新の実施の進捗メモを見られるようにした（指示により追加。それまでは
+    // 継続型タスク一覧にメモを見る手段が無く、編集シートを開くしかなかった）。
+    // 編集シート側(sheetTask)で進捗メモの「編集」欄を継続型に出していない
+    // のは、1日に複数回置ける継続型では「どの実施のメモか」が編集時は
+    // あいまいになるため——それとは別の話で、ここは読み取り専用の表示に
+    // とどめるので同じ問題は起きない。<button>の中には<button>（メモトグル）
+    // を置けないため、完了型と同じく行全体を<div data-act="edit-task">に
+    // する必要がある。
     const repeatRow = t => {
       let badge = "";
       if(t.freq?.type==="perWeek"){
@@ -2845,13 +2854,24 @@ function renderTasks(){
         badge = `<span class="ti-freq">毎日</span>`;
       }
       const inTodayList = hasOccToday(t.id, T);
-      return `<button class="task-item" data-act="edit-task" data-id="${t.id}">
+      const latestOcc = latestOccOf(t.id);
+      const note = t.note || "";
+      const progressNote = latestOcc?.note || "";
+      const progressIsToday = latestOcc?.date === T;
+      const hasNote = !!(note || progressNote);
+      const noteOpen = hasNote && state._noteOpen && state._noteOpen.has(t.id);
+      return `<div class="task-item" data-act="edit-task" data-id="${t.id}">
         ${inTodayList?`<span class="task-today-flag"></span>`:""}
         <div style="flex:1;min-width:0">
           <div class="ti-name">${esc(t.name)}</div>
-          <div class="ti-meta">${rtypeChip(t)}${badge}<span class="ti-cat">${esc(t.category||"—")}</span></div>
+          <div class="ti-meta-row">
+            <div class="ti-meta">${rtypeChip(t)}${badge}<span class="ti-cat">${esc(t.category||"—")}</span></div>
+            ${hasNote?`<button class="note-toggle" data-act="toggle-note" data-id="${t.id}">メモ ${noteOpen?"▲":"▼"}</button>`:""}
+          </div>
+          ${noteOpen && note?`<div class="card-note">${esc(note)}</div>`:""}
+          ${noteOpen && progressNote?`<div class="card-onote">${progressIsToday?"":`<span class="po-date">${esc(fmtDateShort(latestOcc.date))}時点：</span>`}${esc(progressNote)}</div>`:""}
         </div>
-      </button>`;
+      </div>`;
     };
     // v3.93: 種類のグループ順を「ルーティン→スキル」に変更（旧: スキル→ルーティン）。
     // 各グループ内は登録が古い順（createdAtの昇順）に明示的に並べる。
