@@ -1034,7 +1034,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.168";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.169";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2611,7 +2611,11 @@ function renderToday(){
     if(!occs.length && !blocks.length){
       // bare hour tick, or a lone now-marker
       if(isNow) return `<div class="tl-row now">${bars}<div class="tl-time">${esc(label)}</div><span class="tl-node nowdot"></span><div class="tl-body"><span class="now-line"></span></div></div>`;
-      return `<div class="tl-row tick ${g.items.some(x=>x.spanEnd)?"span-end":""}">${bars}<div class="tl-time">${ticksOn ? esc(label) : ""}</div><span class="tl-node dot"></span><div class="tl-body"></div></div>`;
+      // v3.169: 範囲のある予定の終了時刻の行（spanEnd）は、ドットだけでなく
+      // 時間目盛OFFでもラベルを出す——他の空の時刻目盛とは違い、ここは
+      // 実際の予定の終了時刻という意味のある情報のため。
+      const isSpanEnd = g.items.some(x=>x.spanEnd);
+      return `<div class="tl-row tick ${isSpanEnd?"span-end":""}">${bars}<div class="tl-time">${(ticksOn || isSpanEnd) ? esc(label) : ""}</div><span class="tl-node dot"></span><div class="tl-body"></div></div>`;
     }
 
     // 状態（完了・一部実施など）はカード側のバッジで示すので、時刻の目印は
