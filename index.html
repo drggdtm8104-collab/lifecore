@@ -1034,7 +1034,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.169";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.170";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2523,8 +2523,15 @@ function renderToday(){
     if(itemKeys.has(h*60)) continue;
     ticks.push({ tick:true, label:keyToLabel(h*60), key:h*60 });
   }
-  // give every span end its own faint row so the bar has a visible terminus
-  [...new Set(spans.map(sp=>sp.e))].forEach(k=>{
+  // give every span end its own faint row so the bar has a visible terminus.
+  // v3.170: タスク（occRows）に開始〜終了の範囲が指定されているときも、帯
+  // （背景の色付きバー）は付けない——既存方針どおり、帯は予定・目印だけの
+  // もの。ただし終了時刻のドット・ラベルは同じ仕組みで出す。それまでは
+  // 範囲を指定したタスクの終了時刻は、タイムテーブル上に何の印も残らず
+  // （帯が無い＝`spans`に入らない＝終端用のtick行も作られない）、開始時刻
+  // しか見えなかった。
+  const taskRangeEndKeys = occRows.filter(r=>r.occ.plannedMin).map(r=>r.key + r.occ.plannedMin);
+  [...new Set([...spans.map(sp=>sp.e), ...taskRangeEndKeys])].forEach(k=>{
     if(![...blockRows, ...occRows].some(r=>r.key===k) && !ticks.some(t=>t.key===k))
       ticks.push({ tick:true, spanEnd:true, label:keyToLabel(k), key:k });
   });
@@ -4211,8 +4218,12 @@ document.addEventListener("click", e=>{
       if(!inp || !inp.value) break;
       const [hh,mm] = inp.value.split(":").map(Number);
       const delta = parseInt(v, 10) || 0;
-      const total = (((hh*60+mm) + delta) % 1440 + 1440) % 1440;
-      inp.value = pad(Math.floor(total/60)) + ":" + pad(total%60);
+      // v3.170: 分のボタン(-5/-1/+1/+5)は分だけを0〜59の中で巡回させ、時は
+      // 変えない——「ネイティブピッカーで大まかに時間を合わせてから、ボタンで
+      // 分だけ微調整する」という元々の使い方で、分の微調整のつもりで時まで
+      // 繰り上がってしまうと紛らわしいとの指示。
+      const newMm = ((mm + delta) % 60 + 60) % 60;
+      inp.value = pad(hh) + ":" + pad(newMm);
       break;
     }
     case "save-occ": {
@@ -4611,6 +4622,41 @@ document.addEventListener("click", e=>{
     document.getElementById("tkDueMonth").hidden = isDay;
   }
 });
+
+/* ---------- 上側の2択タブ（タイムテーブル/ToDoリスト、完了型/継続型タスク、
+   記録/傾向、覚え書き/メモ）のスワイプ切替。v3.170: 「ボタンタップだけでなく
+   スクロール（左右フリック）でも切り替えられるように」との指示。対象は
+   上側のタブのみ——下側のタブ（今日・タスク・履歴・メモ）はタップ専用の
+   まま変えない（指示どおり）。実際の切替は、対応する既存ボタンを見つけて
+   click()するだけにする——scrollToNowなど、クリック時の副作用をそのまま
+   使い、ロジックを重複させない。その切替ボタン自体がDOMに無い場面
+   （メモを編集中など、上側タブを出していないとき）は何もしない。 */
+const SWIPE_VIEWS = {
+  today:   { key:"todayView", act:"today-view", order:["timeline","list"] },
+  tasks:   { key:"tasksView", act:"tasks-view", order:["single","repeat"] },
+  history: { key:"histView",  act:"hist-view",  order:["records","insights"] },
+  notes:   { key:"notesView", act:"notes-view", order:["remarks","notes"] },
+};
+let swipeX = null, swipeY = null;
+M.addEventListener("touchstart", e=>{
+  if(e.touches.length !== 1 || SW.classList.contains("open") || !SWIPE_VIEWS[state.tab]){ swipeX = null; return; }
+  swipeX = e.touches[0].clientX; swipeY = e.touches[0].clientY;
+}, { passive:true });
+M.addEventListener("touchend", e=>{
+  if(swipeX == null) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - swipeX, dy = t.clientY - swipeY;
+  swipeX = null;
+  // 横方向にしっかり動いた（縦スクロールではない）ときだけ切替と判定する
+  if(Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+  const cfg = SWIPE_VIEWS[state.tab]; if(!cfg) return;
+  const cur = state[cfg.key] || cfg.order[0];
+  const idx = cfg.order.indexOf(cur);
+  const next = cfg.order[dx < 0 ? (idx+1) % cfg.order.length : (idx-1+cfg.order.length) % cfg.order.length];
+  if(next === cur) return;
+  const btn = M.querySelector(`button[data-act="${cfg.act}"][data-v="${next}"]`);
+  if(btn) btn.click();
+}, { passive:true });
 
 /* read the template editor DOM back into the in-progress draft (state._tplDraft) —
    so in-progress edits survive add-row / delete-row, not just Save. Never touches

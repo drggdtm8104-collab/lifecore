@@ -108,16 +108,19 @@ function dispatchClick(dataAct, extra){
   ok("-1 moves 09:05 to 09:04", inp.value === "09:04");
 }
 
-// v3.158-3: 24時またぎの折り返し（深夜0時前後）
+// v3.170: 分のボタンは分だけを0〜59の中で巡回させ、時は変えない
+// （「分の微調整のつもりで時まで繰り上がると紛らわしい」との指示でv3.158
+// 当時の24時またぎ折り返し仕様を変更——以前は total%1440 で時までまたいで
+// いたが、今は時はそのまま分だけをmod 60する）。
 {
   const inp = getEl("oeEnd");
   inp.value = "23:58";
   dispatchClick("time-step", { id:"oeEnd", v:"5" });
-  ok("23:58 +5 wraps to 00:03 (next day)", inp.value === "00:03");
+  ok("23:58 +5 keeps the hour at 23, only the minute wraps (23:58 -> 23:03)", inp.value === "23:03");
 
   inp.value = "00:02";
   dispatchClick("time-step", { id:"oeEnd", v:"-5" });
-  ok("00:02 -5 wraps to 23:57 (previous day)", inp.value === "23:57");
+  ok("00:02 -5 keeps the hour at 00, only the minute wraps (00:02 -> 00:57)", inp.value === "00:57");
 }
 
 // v3.158-4: 時刻が未入力(空欄)のときはエラーにならず何もしない
