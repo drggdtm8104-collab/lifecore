@@ -1034,7 +1034,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.170";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.171";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2530,10 +2530,19 @@ function renderToday(){
   // 範囲を指定したタスクの終了時刻は、タイムテーブル上に何の印も残らず
   // （帯が無い＝`spans`に入らない＝終端用のtick行も作られない）、開始時刻
   // しか見えなかった。
+  // v3.171: 終了時刻がちょうど整数時（例: 18:00）に重なる場合、その時刻には
+  // 既に「何もない時間の目盛」行（上のh loopで作られるbareなtick）が存在して
+  // いた。以前はそれを見て「もう行があるからスキップ」としていたため、既存の
+  // 行には`spanEnd`フラグが付かず、時間目盛OFF時にラベルが出ないままだった
+  // （時間目盛ONなら元々全部ラベルが出るので気付かれなかった）。予定・タスクの
+  // 開始が同じ時刻にある場合（そちらの行で十分なので何もしない）と、空の目盛
+  // 行がたまたま同じ時刻にある場合（spanEndフラグを後付けする）を分けて扱う。
   const taskRangeEndKeys = occRows.filter(r=>r.occ.plannedMin).map(r=>r.key + r.occ.plannedMin);
   [...new Set([...spans.map(sp=>sp.e), ...taskRangeEndKeys])].forEach(k=>{
-    if(![...blockRows, ...occRows].some(r=>r.key===k) && !ticks.some(t=>t.key===k))
-      ticks.push({ tick:true, spanEnd:true, label:keyToLabel(k), key:k });
+    if([...blockRows, ...occRows].some(r=>r.key===k)) return;
+    const existing = ticks.find(t=>t.key===k);
+    if(existing) existing.spanEnd = true;
+    else ticks.push({ tick:true, spanEnd:true, label:keyToLabel(k), key:k });
   });
   // current-time line — placed on the day whose 0:00–28:00 window contains "now",
   // so it lands correctly whether you're viewing today or yesterday
