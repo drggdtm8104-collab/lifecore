@@ -830,6 +830,10 @@
   .tpl-line .tl-r2 input[type="time"]{height:32px;width:74px;flex:none}
   .tpl-line .tl-r2 input[type="number"]{height:32px;width:44px;flex:none}
   .tpl-line .tl-r2 input[type="checkbox"]{width:18px;height:18px}
+  /* v3.172: テンプレの予定行にも通常の予定登録(sheetMarker)と同じ備考欄を
+     持たせる——tl-r2と同じく行全体を使う3段目として続ける。 */
+  .tpl-line .tpl-note-row{grid-column:1/-1;margin-top:4px}
+  .tpl-line .tpl-note-row textarea{min-height:46px}
   /* 開始〜終了・所要 を1行に収める共通レイアウト（シート用、テンプレ編集で使用） */
   .time-row{display:flex;gap:6px;align-items:center;margin-top:4px;flex-wrap:wrap}
   .time-row .tr-sep{flex:none;color:var(--faint);font-size:12px}
@@ -1034,7 +1038,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.171";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.172";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2246,6 +2250,9 @@ function applyTemplate(d, tplId){
   // v3.123: freeBlockはテンプレの予定行自体が持つ（sheetMarkerでの日ごとの
   // 手直しだけだと、テンプレを再適用するたびに元の状態に戻ってしまうため）。
   // 再利用・新規作成のどちらでも、その日の実施へ毎回コピーし直す。
+  // v3.172: 備考（note）もテンプレの予定行自体で持てるようにしたので、同じ
+  // 考え方でコピーし直す（この日だけsheetMarkerで備考を変えても、テンプレを
+  // 再適用すれば元に戻る——freeBlockと同じ仕様）。
   (tpl.plans||[]).forEach(b=>{
     const label = b.label || "";
     const avail = (planPool[label] || []).filter(o=>!planClaimed.has(o.id));
@@ -2253,12 +2260,12 @@ function applyTemplate(d, tplId){
       const ex = avail[0];
       planClaimed.add(ex.id);
       ex.plannedStart = b.time||null; ex.plannedMin = b.mins||null; ex.category = b.category||"その他";
-      ex.freeBlock = !!b.freeBlock;
+      ex.freeBlock = !!b.freeBlock; ex.note = b.note||"";
       return;
     }
     const created = { id:uid(), taskId:null, date:d, title:label, plan:true,
       plannedStart:b.time||null, plannedMin:b.mins||null, category:b.category||"その他",
-      actualMin:null, status:"plan", doneAt:null, adhoc:false, note:"", fromTpl:true, freeBlock: !!b.freeBlock };
+      actualMin:null, status:"plan", doneAt:null, adhoc:false, note:b.note||"", fromTpl:true, freeBlock: !!b.freeBlock };
     db.occurrences.push(created);
     planClaimed.add(created.id);
   });
@@ -3233,7 +3240,7 @@ function renderTemplates(){
 
     if(tv === "timeline"){
       const rows = [
-        ...(draft.plans||[]).map(b=>({ kind:"plan", time:b.time, label:b.label, mins:b.mins||null })),
+        ...(draft.plans||[]).map(b=>({ kind:"plan", time:b.time, label:b.label, mins:b.mins||null, note:b.note||"" })),
         ...(draft.tasks||[]).map(r=>({ kind:"task", time:r.time, label:nameOf(r.taskId), mins:r.mins||null })),
       ].sort((a,b)=>timeKey(a.time)-timeKey(b.time));
       html += `<div class="tpl-preview" style="font-weight:600;font-size:13px;margin-top:8px">${esc(draft.name)}</div>`;
@@ -3245,7 +3252,8 @@ function renderTemplates(){
           const k = timeKey(b.time);
           const end = b.mins ? ` <span class="blk-end">${keyToLabel(k)}–${keyToLabel(k+b.mins)} ・ ${fmtDur(b.mins)}</span>` : "";
           const tag = b.kind==="task" ? ` <span class="tpl-rec-tag">タスク</span>` : "";
-          html += `<div class="tl-row"><div class="tl-time">${esc(keyToLabel(k))}</div><span class="tl-node block-node"></span><div class="tl-body"><span class="tl-blocklabel">${esc(b.label||"(無題)")}${end}${tag}</span></div></div>`;
+          const noteHTML = b.note ? `<div class="mk-note">${esc(b.note)}</div>` : "";
+          html += `<div class="tl-row"><div class="tl-time">${esc(keyToLabel(k))}</div><span class="tl-node block-node"></span><div class="tl-body"><span class="tl-blocklabel">${esc(b.label||"(無題)")}${end}${tag}</span>${noteHTML}</div></div>`;
         });
         html += `</div>`;
       }
@@ -3269,6 +3277,7 @@ function renderTemplates(){
           ${b.mins ? `<button type="button" class="mini-clear" data-act="tpl-clear-span" data-i="${i}">クリア</button>` : ""}
           <label>自由時間 <input type="checkbox" data-f="free" ${b.freeBlock?"checked":""}></label>
         </div>
+        <div class="tpl-note-row">${noteTextarea("tplNote-"+i, b.note, "補足など（任意）", ' data-f="note"')}</div>
       </div>`;
     });
     html += `</div>
@@ -4442,7 +4451,7 @@ document.addEventListener("click", e=>{
       const rawMin = (document.getElementById("tpMin")?.value || "").trim();
       let mins = end ? durFromEnd(st, end) : (rawMin === "" ? null : (parseInt(rawMin,10) || null));
       if(mins === 0) mins = null;
-      draft.plans.push({ time:st, label:name, mins, category:"" });
+      draft.plans.push({ time:st, label:name, mins, category:"", note:"" });
       sortBlocks(draft.plans);
       closeSheet(); render(); break;
     }
@@ -4685,7 +4694,8 @@ function readTplEditor(){
     let mins = end ? durFromEnd(time, end) : (rawMins === "" ? null : (parseInt(rawMins,10) || null));
     if(mins === 0) mins = null;
     const free = !!line.querySelector('[data-f="free"]')?.checked;
-    return { time, label: line.querySelector('[data-f="label"]').value.trim(), mins, category:"", freeBlock: free };
+    const note = (line.querySelector('[data-f="note"]')?.value || "").trim();
+    return { time, label: line.querySelector('[data-f="label"]').value.trim(), mins, category:"", freeBlock: free, note };
   });
   // task placements
   const taskLines = [...document.querySelectorAll("#tplTasks .tpl-task-line")];
