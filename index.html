@@ -34,7 +34,7 @@
     --done:#2F6F5E;
     --partial:#A9791C;
     --defer:#868C97;
-    --over:#B4482E;
+    --over:#C62828;
     --wash:#E9F1EE;
     --shadow:0 1px 2px rgba(22,32,29,.05), 0 3px 12px rgba(22,32,29,.06);
     --radius:13px;
@@ -63,7 +63,7 @@
     --done:#5FB79E;
     --partial:#D8A54A;
     --defer:#868C97;
-    --over:#DB7D63;
+    --over:#EF5350;
     --wash:#182420;
     --shadow:0 1px 2px rgba(0,0,0,.40), 0 3px 14px rgba(0,0,0,.46);
   }
@@ -72,7 +72,7 @@
     --ground:#E8E0CC; --surface:#F0E9D8; --surface-2:#DED5BE;
     --ink:#1E2529; --muted:#5F6866; --faint:#98A19D; --hairline:#D2C9AE;
     --primary:#2F6F5E; --primary-ink:#22574A; --on-primary:#FFFFFF; --done:#2F6F5E;
-    --partial:#A9791C; --defer:#868C97; --over:#B4482E; --wash:#E9F1EE;
+    --partial:#A9791C; --defer:#868C97; --over:#C62828; --wash:#E9F1EE;
     --shadow:0 1px 2px rgba(40,35,20,.08), 0 3px 12px rgba(40,35,20,.09);
   }
   :root[data-theme="rosegrey"]{
@@ -80,7 +80,7 @@
     --ground:#E6D9D8; --surface:#EFE4E3; --surface-2:#D6C7C6;
     --ink:#1E2529; --muted:#5F6866; --faint:#98A19D; --hairline:#CBB9B8;
     --primary:#2F6F5E; --primary-ink:#22574A; --on-primary:#FFFFFF; --done:#2F6F5E;
-    --partial:#A9791C; --defer:#868C97; --over:#B4482E; --wash:#E9F1EE;
+    --partial:#A9791C; --defer:#868C97; --over:#C62828; --wash:#E9F1EE;
     --shadow:0 1px 2px rgba(40,25,24,.08), 0 3px 12px rgba(40,25,24,.09);
   }
   :root[data-theme="navy"]{
@@ -88,7 +88,7 @@
     --ground:#141B24; --surface:#1C2530; --surface-2:#242F3C;
     --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#2E3A48;
     --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
-    --partial:#D8A54A; --defer:#868C97; --over:#DB7D63; --wash:#283530;
+    --partial:#D8A54A; --defer:#868C97; --over:#EF5350; --wash:#283530;
     --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
   }
   :root[data-theme="forest"]{
@@ -96,7 +96,7 @@
     --ground:#171D1A; --surface:#202723; --surface-2:#29312C;
     --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#333C35;
     --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
-    --partial:#D8A54A; --defer:#868C97; --over:#DB7D63; --wash:#283530;
+    --partial:#D8A54A; --defer:#868C97; --over:#EF5350; --wash:#283530;
     --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
   }
   :root[data-theme="warmgrey"]{
@@ -104,7 +104,7 @@
     --ground:#1E1C1A; --surface:#282624; --surface-2:#322F2C;
     --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#3C3835;
     --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
-    --partial:#D8A54A; --defer:#868C97; --over:#DB7D63; --wash:#283530;
+    --partial:#D8A54A; --defer:#868C97; --over:#EF5350; --wash:#283530;
     --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
   }
 
@@ -1038,7 +1038,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.172";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.173";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1933,10 +1933,12 @@ const dueText = (due, prec) => {
   const T = todayStr(), lab = dateLabel(due, prec);
   return due < T ? `期限切れ ${lab}` : due === T ? "今日まで" : `期限 ${lab}`;
 };
-/* 期限の強調表示: 期限切れ・今日まで（バケット0）＝オレンジ「over」、
+/* 期限の強調表示: 期限切れ・今日まで（バケット0）＝赤「over」、
    7日以内（バケット1、今日は除く）＝黄「soon」、それより先／なし＝無色。
    v3.59: 「今日まで」だけをオレンジにしていたのを「期限切れ・今日まで」に広げ、
-   代わりに「7日以内」を新設の黄色にした（dueBucket の区切りをそのまま使う）。 */
+   代わりに「7日以内」を新設の黄色にした（dueBucket の区切りをそのまま使う）。
+   v3.173: 重要度「高」・期限切れ/今日までの強調色（--over）を、オレンジ系
+   （#B4482E/#DB7D63）から赤系（#C62828/#EF5350）に変更した。 */
 const dueClass = due => !due ? "" : dueBucket(due)===0 ? "over" : dueBucket(due)===1 ? "soon" : "";
 const dueChip = (due, prec) => `<span class="ti-due ${dueClass(due)}">${dueText(due,prec)}</span>`;
 const byDue = (a,b) => (a.due||"9999-99-99").localeCompare(b.due||"9999-99-99")
