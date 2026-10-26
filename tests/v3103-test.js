@@ -139,7 +139,8 @@ const sorted = [rHighOut, rLowIn, rMidIn, rHighIn].sort(T.byRemarkShow).map(x=>x
 ok("in-period items sorted before out-of-period, and by prio within group",
   JSON.stringify(sorted) === JSON.stringify(["high-in","mid-in","low-in","high-out"]));
 
-// -------- Test 4: renderTasks shows prio chip and period label, dims out-of-period item --------
+// -------- Test 4: renderTasks dims out-of-period item, but (v3.174〜) no longer
+// shows the prio chip or period label in the list itself --------
 T.db.remarks = [
   { id:"r1", text:"重要な覚え書き", prio:"high", showFrom:null, showTo:null, createdAt:"", updatedAt:"" },
   { id:"r2", text:"期限切れの覚え書き", prio:"low", showFrom:past2, showTo:past, createdAt:"", updatedAt:"" },
@@ -147,9 +148,9 @@ T.db.remarks = [
 T.state.tab = "notes";
 T.state.notesView = "remarks";
 T.render();
-ok("high-prio remark's chip rendered (重要 高)", M.innerHTML.includes("重要 高"));
-ok("out-of-period remark shows period label", M.innerHTML.includes("表示期間:"));
-ok("out-of-period remark gets the dimmed class", M.innerHTML.includes("rm-dim"));
+ok("remark list no longer renders the prio chip (重要 高)", !M.innerHTML.includes("重要 高"));
+ok("remark list no longer shows the period label", !M.innerHTML.includes("表示期間:"));
+ok("out-of-period remark still gets the dimmed class", M.innerHTML.includes("rm-dim"));
 // order check: r1 (in period) should appear before r2 (out of period) in the HTML
 ok("in-period remark appears before out-of-period remark in rendered HTML",
   M.innerHTML.indexOf("重要な覚え書き") < M.innerHTML.indexOf("期限切れの覚え書き"));

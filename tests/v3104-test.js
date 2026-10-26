@@ -90,12 +90,15 @@ T.state.tab = "notes";
 T.state.notesView = "remarks";
 T.render();
 
+// v3.174: 「重要度と表示期間は一覧には出さないようにして」——v3.104で位置
+// 調整したrm-meta（重要度チップ＋表示期間キャプション）の行自体を一覧から
+// 削除した。このテストの関心（チップと期間の位置関係）は意味が無くなった
+// ため、「rm-metaごと出ない」ことの確認に置き換える。
 const html = M.innerHTML;
-ok("rm-text appears before rm-meta (text first, meta row below)", html.indexOf("rm-text") < html.indexOf("rm-meta"));
-ok("inside the meta row, prio chip (重要 高) comes before the period label (表示期間:)",
-  html.indexOf("重要 高") < html.indexOf("表示期間:"));
-ok("prio chip is no longer the first thing rendered in the card (moved down)",
-  html.indexOf("換気を忘れずに") < html.indexOf("重要 高"));
+ok("rm-text still renders the remark's content", html.includes("換気を忘れずに"));
+ok("the rm-meta row (prio chip + period label) no longer renders at all", !html.includes("rm-meta"));
+ok("the prio chip (重要 高) no longer renders in the list", !html.includes("重要 高"));
+ok("the period label (表示期間:) no longer renders in the list", !html.includes("表示期間:"));
 
 console.log(fail === 0 ? "\nALL PASS" : `\n${fail} FAILURES`);
 process.exit(fail ? 1 : 0);

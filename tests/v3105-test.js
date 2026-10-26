@@ -97,12 +97,17 @@ T.state.notesView = "remarks";
 T.render();
 const html = M.innerHTML;
 
-// -------- Test 1: unset period shows "表示期間: 指定なし" in the same format as set ones --------
-ok("no-period remark shows '表示期間: 指定なし'", html.includes("表示期間: 指定なし"));
-ok("no-period item still renders the rm-date caption element", (html.match(/class="rm-date"/g)||[]).length === 3);
+// v3.174: 「重要度と表示期間は一覧には出さないようにして」——以降、一覧の
+// 各行には表示期間キャプション（rm-date/「表示期間: ...」）も重要度チップも
+// 出さない。並び順・表示期間外の仕分け（due-head）・薄表示（rm-dim）だけは
+// 維持する。Test 1・2はこの仕様変更に合わせて更新。
 
-// -------- Test 2: set period still shows actual dates, not affected --------
-ok("with-period remark shows its actual date range", new RegExp("表示期間: .*〜.*").test(html) && html.includes(T.todayStr().slice(5).replace(/^0/,"")) === false || true);
+// -------- Test 1: the list no longer shows the "表示期間: ..." caption or rm-date element --------
+ok("remark list no longer shows '表示期間: ...' captions", !html.includes("表示期間: "));
+ok("remark list no longer renders rm-date caption elements", !/class="rm-date"/.test(html));
+
+// -------- Test 2: the list no longer shows the priority chip (rm-meta) --------
+ok("remark list no longer renders the rm-meta/priority row", !html.includes('class="rm-meta"') && !html.includes('class="ti-prio'));
 
 // -------- Test 3: out-of-period items are grouped under a "表示期間外" due-head divider --------
 ok("has a 表示期間外 group divider (due-head)", html.includes('<div class="due-head">表示期間外<span>1</span></div>'));

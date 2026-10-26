@@ -572,12 +572,6 @@
     font-size:12.5px;color:var(--ink);line-height:1.6;
     white-space:pre-wrap;overflow-wrap:anywhere;
   }
-  .remark-item .rm-date{
-    font-family:var(--font-mono);font-size:10px;color:var(--faint);
-  }
-  /* v3.104: 重要度チップを本文の下、表示期間キャプションと同じ行の一番左に
-     移動（ユーザーの指示による）。表示期間が無いときはチップだけが並ぶ。 */
-  .remark-item .rm-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .note-editor{display:flex;flex-direction:column;gap:8px;margin-top:6px}
   .note-editor .ne-meta{font-family:var(--font-mono);font-size:10.5px;color:var(--faint);display:flex;gap:10px;align-items:baseline}
   .note-editor .ne-del{font-family:var(--font-body);font-size:11px;font-weight:600;color:var(--over)}
@@ -1038,7 +1032,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.173";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.174";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3166,18 +3160,15 @@ function renderNotes(){
       // v3.105: 未設定のものも含め表示期間のキャプションを常に同じ書式で出す
       // （未設定側は「指定なし」）。表示期間外は薄くするだけでなく、完了型
       // タスクの4象限のような`.due-head`の見出し「表示期間外」で仕分ける。
-      const remarkRow = r => {
-        const periodLabel = (!r.showFrom && !r.showTo)
-          ? "表示期間: 指定なし"
-          : `表示期間: ${r.showFrom?mdShort(r.showFrom):"指定なし"}〜${r.showTo?mdShort(r.showTo):"指定なし"}`;
-        return `<button class="remark-item${remarkInPeriod(r)?"":" rm-dim"}" data-act="edit-remark" data-id="${r.id}">
+      // v3.174: 「重要度と表示期間は一覧には出さないようにして」——重要度
+      // チップと表示期間キャプション（.rm-meta）は一覧からは外す。並び順
+      // （byRemarkShow、表示期間内→重要度順）と「表示期間外」見出しでの
+      // 仕分け・薄表示（rm-dim）自体は、期間外のものを下にまとめる実用上の
+      // 機能なのでそのまま残す。
+      const remarkRow = r =>
+        `<button class="remark-item${remarkInPeriod(r)?"":" rm-dim"}" data-act="edit-remark" data-id="${r.id}">
           <span class="rm-text">${esc(r.text)}</span>
-          <div class="rm-meta">
-            ${prioChip(r)}
-            <span class="rm-date">${periodLabel}</span>
-          </div>
         </button>`;
-      };
       const items = [...db.remarks].sort(byRemarkShow);
       const inItems = items.filter(remarkInPeriod);
       const outItems = items.filter(r=>!remarkInPeriod(r));
