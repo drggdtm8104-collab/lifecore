@@ -1032,7 +1032,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.174";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.175";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1173,7 +1173,7 @@ const CONTAMINATED_TASK_IDS = new Set([
   "07858496","24446b30","5602f258","b269b4a8","7ffaf36e","06df156f","c9221e46","a94c6bc0","2acda6e8",
 ]);
 let db = loadLocal();
-let state = { tab:"today", todayView:"timeline", tplView:"timeline", tasksView:"single", taskSort:"default", pickView:"single", pickSort:"default", noteId:null, notesView:"notes", date: todayStr(), histSpan:"day", histDate: todayStr(), histView:"records", settingsTplId:null, _setOpen:new Set(), _noteOpen:new Set(), _tplDraft:null, _highlightOccId:null, _notePopoutId:null };
+let state = { tab:"today", todayView:"timeline", tplView:"timeline", tasksView:"single", taskSort:"default", pickView:"single", pickSort:"default", noteId:null, notesView:"notes", date: todayStr(), histSpan:"day", histDate: todayStr(), histView:"records", settingsTplId:null, _setOpen:new Set(), _noteOpen:new Set(), _tplDraft:null, _highlightOccId:null, _notePopoutId:null, _pickReturn:false };
 
 let DB = null;                // Artifact DB namespace, or null (offline / not on claude.ai)
 let dbReady = false;
@@ -4129,7 +4129,9 @@ document.addEventListener("click", e=>{
       break;
     }
 
-    case "pick-add": sheetAddOcc(id); break;
+    // v3.175: 「ToDoリストに追加」の候補一覧から選んだ場合は、追加後に続けて
+    // 選びやすいよう候補一覧へ戻す（下のcase "add-today"参照）。
+    case "pick-add": state._pickReturn = true; sheetAddOcc(id); break;
     case "ao-clear-time": {
       const s = document.getElementById("aoStart"), e = document.getElementById("aoEnd");
       if(s) s.value = ""; if(e) e.value = "";
@@ -4158,7 +4160,13 @@ document.addEventListener("click", e=>{
       db.occurrences.push({ id:uid(), taskId:t.id, date:state.date, plannedStart:st, plannedMin:pm,
         actualMin: null, status: "planned",
         doneAt: null, adhoc:false, meal:false, title:null, note:carryNote });
-      save(); closeSheet(); render(); break;
+      save(); render();
+      // v3.175: 「ToDoリストに追加」の候補一覧から来た場合は、続けて別の
+      // タスクを追加しやすいよう候補一覧に戻す（候補からはこの日のうちに
+      // 置いた完了型タスクが自然に外れる）。タスク登録画面の「保存して
+      // 追加」から来た場合は従来通り閉じる。
+      if(state._pickReturn) sheetTodayPick(); else closeSheet();
+      break;
     }
     case "add-today-pick": sheetTodayPick(); break;
     case "pick-view": { state.pickView = v; sheetTodayPick(); break; }
@@ -4359,6 +4367,9 @@ document.addEventListener("click", e=>{
       const t = saveTaskFromForm(id);
       if(!t) break;
       save();
+      // v3.175: タスク登録画面からの「保存して追加」はそもそも候補一覧を
+      // 経由していないので、追加後は候補一覧に戻さず通常通り閉じる。
+      state._pickReturn = false;
       sheetAddOcc(t.id);
       break;
     }
