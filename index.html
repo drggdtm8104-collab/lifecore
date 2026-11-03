@@ -1032,7 +1032,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.175";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.176";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -4652,7 +4652,11 @@ document.addEventListener("click", e=>{
    まま変えない（指示どおり）。実際の切替は、対応する既存ボタンを見つけて
    click()するだけにする——scrollToNowなど、クリック時の副作用をそのまま
    使い、ロジックを重複させない。その切替ボタン自体がDOMに無い場面
-   （メモを編集中など、上側タブを出していないとき）は何もしない。 */
+   （メモを編集中など、上側タブを出していないとき）は何もしない。
+   v3.176: 「端まで行ったらそこから先は進まないように（左右の端は繋がって
+   いない）」との指示。以前は配列の最後と最初が%で循環していて、一番右の
+   画面でさらに左へフリックすると一番左の画面に“ワープ”してしまっていた。
+   端では単に何もしない（nextIdxが範囲外ならreturn）ようにして、循環を無くす。 */
 const SWIPE_VIEWS = {
   today:   { key:"todayView", act:"today-view", order:["timeline","list"] },
   tasks:   { key:"tasksView", act:"tasks-view", order:["single","repeat"] },
@@ -4674,7 +4678,10 @@ M.addEventListener("touchend", e=>{
   const cfg = SWIPE_VIEWS[state.tab]; if(!cfg) return;
   const cur = state[cfg.key] || cfg.order[0];
   const idx = cfg.order.indexOf(cur);
-  const next = cfg.order[dx < 0 ? (idx+1) % cfg.order.length : (idx-1+cfg.order.length) % cfg.order.length];
+  // v3.176: 左右の端は繋がっていない——端まで来たらそこで止まる（一周して戻らない）
+  const nextIdx = dx < 0 ? idx + 1 : idx - 1;
+  if(nextIdx < 0 || nextIdx >= cfg.order.length) return;
+  const next = cfg.order[nextIdx];
   if(next === cur) return;
   const btn = M.querySelector(`button[data-act="${cfg.act}"][data-v="${next}"]`);
   if(btn) btn.click();

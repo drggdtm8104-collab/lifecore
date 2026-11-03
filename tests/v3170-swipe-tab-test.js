@@ -166,10 +166,10 @@ ok("swiping while editing a note does not touch notesView", T.state.notesView ==
 
 // --- 7. メモタブ一覧: 覚え書き<->メモの切替もスワイプで動く ---
 T.state.noteId = null;
-T.state.notesView = "notes";
+T.state.notesView = "remarks";
 T.renderNotes();
-swipe(300, 400, 220, 405);   // 左へ: メモ(notes) -> 覚え書き(remarks)
-ok("swiping left in the notes list switches notes -> remarks", T.state.notesView === "remarks");
+swipe(300, 400, 220, 405);   // 左へ: 覚え書き(remarks) -> メモ(notes)
+ok("swiping left in the notes list switches remarks -> notes", T.state.notesView === "notes");
 
 console.log(fail === 0 ? "\nALL PASS" : `\n${fail} FAILURES`);
 process.exit(fail ? 1 : 0);
