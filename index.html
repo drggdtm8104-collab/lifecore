@@ -1032,7 +1032,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.176";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.177";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3275,7 +3275,7 @@ function renderTemplates(){
     });
     html += `</div>
       <div class="sec-title sec-title-add" style="margin:16px 2px 4px">
-        <span>配置するタスク</span><button class="btn tiny" data-act="tpl-task-add">＋ 追加</button>
+        <span>配置するタスク</span><button class="btn tiny primary" data-act="tpl-task-add">＋ 追加</button>
       </div>`;
     if(!(draft.tasks||[]).length){
       html += `<div class="tl-hint">まだありません。登録ずみのタスクから選んで置けます。</div>`;
@@ -3286,7 +3286,7 @@ function renderTemplates(){
         <div class="tt-name">${esc(nameOf(r.taskId))}</div>
         <button class="mini-x" data-act="tpl-task-del" data-i="${i}" aria-label="削除">×</button>
         <div class="tl-r2">
-          <label>開始 <input type="time" data-f="time" value="${esc(r.time||"")}"></label>
+          <label>開始（空欄可） <input type="time" data-f="time" value="${esc(r.time||"")}"></label>
           <label>所要 <input type="number" data-f="mins" value="${r.mins ?? ""}" min="1" placeholder="分">分</label>
         </div>
       </div>`;
@@ -3499,14 +3499,17 @@ function sheetTplTaskPick(){
     <p class="sheet-sub">登録ずみのタスクから選びます。次の画面で開始時刻を指定してから配置されます。同じタスクを時間を変えて複数回配置することもできます。</p><div>${body}</div>`);
 }
 
-/* -- タスクを配置する前に、必ず開始時刻を指定させる（黙って仮の時刻を置かない） -- */
+/* -- タスクを配置する前の開始時刻入力。v3.83のToDoリスト追加（sheetAddOcc）
+   と同じく、空欄のままなら「時間未定」として配置する（v3.177〜。以前は
+   開始時刻を必須にしていたが、時間を決めずにまず配置しておきたい場合に
+   対応できなかったため緩和した）。 -- */
 function sheetTplTaskTime(taskId){
   const task = db.tasks.find(t=>t.id===taskId);
   if(!task) return;
   openSheet(`<h2>${esc(task.name)} を配置</h2>
-    <p class="sheet-sub">開始時刻を指定してください。</p>
+    <p class="sheet-sub">開始時刻を入れると時間割に置かれます。空欄なら「時間未定」で配置。</p>
     <div class="row2">
-      <label class="fld"><span>開始（時刻）</span><input type="time" id="ttStart"></label>
+      <label class="fld"><span>開始（時刻・空欄可）</span><input type="time" id="ttStart"></label>
       <label class="fld"><span>所要（分・任意）</span><input type="number" id="ttMin" inputmode="numeric" value="${task.estMin ?? ""}" min="1" placeholder="分"></label>
     </div>
     <div class="sheet-actions">
@@ -4480,8 +4483,7 @@ document.addEventListener("click", e=>{
     case "tpl-task-pick": sheetTplTaskTime(id); break;
     case "tpl-task-confirm": {
       const draft = state._tplDraft; if(!draft) break;
-      const st = document.getElementById("ttStart")?.value;
-      if(!st){ document.getElementById("ttStart").focus(); toast("開始時刻を入力してください"); break; }
+      const st = document.getElementById("ttStart")?.value || null;   // 空欄なら時間未定
       const rawMin = (document.getElementById("ttMin")?.value || "").trim();
       const mins = rawMin === "" ? null : (parseInt(rawMin,10) || null);
       draft.tasks = draft.tasks || [];
@@ -4708,10 +4710,11 @@ function readTplEditor(){
     const note = (line.querySelector('[data-f="note"]')?.value || "").trim();
     return { time, label: line.querySelector('[data-f="label"]').value.trim(), mins, category:"", freeBlock: free, note };
   });
-  // task placements
+  // task placements。v3.177: 予定(plans)行とは違い、タスクの配置は開始時刻を
+  // 空欄のまま（時間未定）にできるので、"00:00"を補わずそのまま空欄を保つ。
   const taskLines = [...document.querySelectorAll("#tplTasks .tpl-task-line")];
   draft.tasks = taskLines.map(line=>{
-    const time    = line.querySelector('[data-f="time"]').value || "00:00";
+    const time    = line.querySelector('[data-f="time"]').value || null;
     const rawMins = (line.querySelector('[data-f="mins"]').value || "").trim();
     let mins = rawMins === "" ? null : (parseInt(rawMins,10) || null);
     if(mins === 0) mins = null;
