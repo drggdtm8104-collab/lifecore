@@ -1032,7 +1032,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.177";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.178";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3254,7 +3254,7 @@ function renderTemplates(){
     } else {
     html += `<div id="tplForm"><label class="fld"><span>タイトル</span><input type="text" id="tplName" value="${esc(draft.name)}"></label>
     <div class="sec-title sec-title-add" style="margin:14px 2px 4px">
-      <span>予定</span><button class="btn tiny" data-act="tpl-add-row">＋ 追加</button>
+      <span>予定</span><button class="btn tiny primary" data-act="tpl-add-row">＋ 追加</button>
     </div>
     <div class="tpl-editor" id="tplEditor">`;
     (draft.plans||[]).forEach((b,i)=>{
