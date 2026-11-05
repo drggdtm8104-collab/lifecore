@@ -108,19 +108,28 @@ T.db.settings = {};
 // -------- 1. 開始時刻を空欄のまま「追加」しても、ブロックされずに下書きに積まれる --------
 T.state._tplDraft = { tplId:"tpl1", name:"テスト用テンプレ", plans:[], tasks:[] };
 elStore.ttStart = mkEl("ttStart"); elStore.ttStart.value = "";
-elStore.ttMin = mkEl("ttMin"); elStore.ttMin.value = "";
+elStore.ttEnd = mkEl("ttEnd"); elStore.ttEnd.value = "";
 dispatchClick("tpl-task-confirm", { id:"watertask" });
 
 ok("開始時刻が空欄でも下書きにタスクが1件積まれる", T.state._tplDraft.tasks.length === 1);
 ok("積まれた行は時間未定(time:null)になる", T.state._tplDraft.tasks[0] && T.state._tplDraft.tasks[0].time === null);
 ok("追加後、シートは閉じる", sheetEl.innerHTML === "");
 
-// -------- 2. 開始時刻を入れればその時刻で積まれる（従来どおり動く） --------
+// -------- 2. 開始時刻を入れ、終了時刻からの算出でその時刻・所要が積まれる
+//            （v3.179〜。sheetAddOcc/add-todayと同じ「終了から所要を算出」方式） --------
 T.state._tplDraft.tasks = [];
-elStore.ttStart.value = "08:30"; elStore.ttMin.value = "15";
+elStore.ttStart.value = "08:30"; elStore.ttEnd.value = "08:45";
 dispatchClick("tpl-task-confirm", { id:"watertask" });
 ok("開始時刻を入れればその時刻で積まれる", T.state._tplDraft.tasks[0] && T.state._tplDraft.tasks[0].time === "08:30");
-ok("所要分も一緒に積まれる", T.state._tplDraft.tasks[0] && T.state._tplDraft.tasks[0].mins === 15);
+ok("終了時刻から所要(15分)が算出されて積まれる", T.state._tplDraft.tasks[0] && T.state._tplDraft.tasks[0].mins === 15);
+
+// -------- 2b. 開始のみで終了が空欄なら、タスクの目安時間(estMin)が使われる --------
+T.db.tasks[0].estMin = 10;
+T.state._tplDraft.tasks = [];
+elStore.ttStart.value = "09:00"; elStore.ttEnd.value = "";
+dispatchClick("tpl-task-confirm", { id:"watertask" });
+ok("終了が空欄ならタスクの目安時間が所要として積まれる", T.state._tplDraft.tasks[0] && T.state._tplDraft.tasks[0].mins === 10);
+delete T.db.tasks[0].estMin;
 
 // -------- 3. applyTemplate(): 時間未定(time:null)のタスク行から、
 //            plannedStart:null の実施が作られる --------

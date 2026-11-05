@@ -1032,7 +1032,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.178";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.179";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1173,7 +1173,7 @@ const CONTAMINATED_TASK_IDS = new Set([
   "07858496","24446b30","5602f258","b269b4a8","7ffaf36e","06df156f","c9221e46","a94c6bc0","2acda6e8",
 ]);
 let db = loadLocal();
-let state = { tab:"today", todayView:"timeline", tplView:"timeline", tasksView:"single", taskSort:"default", pickView:"single", pickSort:"default", noteId:null, notesView:"notes", date: todayStr(), histSpan:"day", histDate: todayStr(), histView:"records", settingsTplId:null, _setOpen:new Set(), _noteOpen:new Set(), _tplDraft:null, _highlightOccId:null, _notePopoutId:null, _pickReturn:false };
+let state = { tab:"today", todayView:"timeline", tplView:"timeline", tasksView:"single", taskSort:"default", pickView:"single", pickSort:"default", tplPickView:"single", tplPickSort:"default", noteId:null, notesView:"notes", date: todayStr(), histSpan:"day", histDate: todayStr(), histView:"records", settingsTplId:null, _setOpen:new Set(), _noteOpen:new Set(), _tplDraft:null, _highlightOccId:null, _notePopoutId:null, _pickReturn:false };
 
 let DB = null;                // Artifact DB namespace, or null (offline / not on claude.ai)
 let dbReady = false;
@@ -3475,7 +3475,15 @@ function sheetPickTemplate(){
     </div>` : `<div class="sheet-actions"><button class="btn ghost" data-act="close-sheet">キャンセル</button></div>`}`);
 }
 
-/* -- pick a registered task to place into the template being edited -- */
+/* -- pick a registered task to place into the template being edited.
+   v3.179: 「普段の＋ボタンの『予定を追加』『ToDoリストに追加』と同じような
+   仕様にして（押した後の画面を同じにする）」との指示で、通常の
+   「ToDoリストに追加」（sheetTodayPick）と同じ見た目・情報量・絞り込み
+   （完了型／継続型の切替、完了型のみの並び順）にした。候補の絞り込み
+   自体はテンプレ編集特有のまま（今日すでに置いたかどうかではなく、
+   単に完了ずみの完了型タスクだけを除外——同じタスクを時間を変えて何度でも
+   配置できるため）。`state.tplPickView`/`tplPickSort`は、スケジュール
+   タブ側の`pickView`/`pickSort`と混線しないよう別の状態に分けている。 -- */
 function sheetTplTaskPick(){
   // 同じタスクを時間を変えて何度でも配置できる（v3.20）ので、既に配置ずみの
   // タスクも一覧から外さない。ここでは "現在編集中の下書き" を見る — 保存ずみの
@@ -3483,43 +3491,98 @@ function sheetTplTaskPick(){
   const draft = state._tplDraft;
   const placedCount = {};
   (draft?.tasks || []).forEach(r=>{ placedCount[r.taskId] = (placedCount[r.taskId] || 0) + 1; });
-  const cands = db.tasks.filter(t=>!(t.kind==="single" && t.done));
-  const body = cands.length ? cands.map(t=>{
-    const info = t.kind==="repeat"
-      ? (t.freq?.type==="daily" ? "継続 ・ 毎日" : `継続 ・ 週${t.freq.n}回`)
-      : "完了型";
+  const d = state.date;
+  const view = state.tplPickView === "repeat" ? "repeat" : "single";
+  const cands = db.tasks.filter(t=>t.kind===view && !(t.kind==="single" && t.done));
+
+  const candRow = t => {
+    const metaChips = t.kind==="single"
+      ? `${prioChip(t)}${fieldChip("開始", mdShort(t.startDate, t.startPrec))}${fieldChip("期限", mdShort(t.due, t.duePrec), dueClass(t.due))}<span class="ti-cat">${esc(t.category||"—")}</span>`
+      : `${rtypeChip(t)}${t.freq?.type==="perWeek"
+          ? `<span class="ti-freq ${weekCount(t.id,d)>=t.freq.n?"met":""}">今週 ${weekCount(t.id,d)}/${t.freq.n}</span>`
+          : `<span class="ti-freq">毎日</span>`}<span class="ti-cat">${esc(t.category||"—")}</span>`;
     const n = placedCount[t.id] || 0;
     return `<button class="cand" data-act="tpl-task-pick" data-id="${t.id}">
       <div style="flex:1;min-width:0"><div class="cd-name">${esc(t.name)}</div>
-      <div class="cd-meta"><span>${esc(t.category||"—")}</span>${t.estMin?`<span>${t.estMin}分</span>`:""}<span>${info}</span>${n?`<span>配置ずみ ×${n}</span>`:""}</div></div>
+      <div class="cd-meta">${metaChips}${n?`<span>配置ずみ ×${n}</span>`:""}</div>
+      ${t.note?`<div class="cd-note">${esc(t.note)}</div>`:""}</div>
       <span class="btn tiny primary">置く</span>
     </button>`;
-  }).join("") : `<div class="empty" style="border:none">置けるタスクがありません。<br>「タスク」タブで登録してください。</div>`;
-  openSheet(`<h2>タスクを配置</h2>
-    <p class="sheet-sub">登録ずみのタスクから選びます。次の画面で開始時刻を指定してから配置されます。同じタスクを時間を変えて複数回配置することもできます。</p><div>${body}</div>`);
+  };
+
+  let sortUI = "", body;
+  if(!cands.length){
+    body = `<div class="empty" style="border:none">置ける${view==="single"?"完了型":"継続型"}タスクがありません。<br>「タスク」タブで登録してください。</div>`;
+  } else if(view === "single"){
+    const sort = ["default","prio","due"].includes(state.tplPickSort) ? state.tplPickSort : "default";
+    sortUI = `<div style="display:flex;align-items:center;gap:8px;margin:2px 0 8px">
+      <span style="font-size:12px;color:var(--muted)">並び順</span>
+      <div class="seg" style="margin:0">
+        <button class="${sort==="default"?"on":""}" data-act="tpl-pick-sort" data-v="default">デフォルト</button>
+        <button class="${sort==="prio"?"on":""}" data-act="tpl-pick-sort" data-v="prio">重要度順</button>
+        <button class="${sort==="due"?"on":""}" data-act="tpl-pick-sort" data-v="due">期限順</button>
+      </div>
+    </div>`;
+    if(sort !== "default"){
+      body = [...cands].sort(sort==="prio" ? byPrioFlat : byDueFlat).map(candRow).join("");
+    } else {
+      const present = QUADRANTS.filter(([q]) => cands.some(t=>quadrant(t)===q));
+      body = present.map(([q,lab])=>{
+        const items = cands.filter(t=>quadrant(t)===q).sort(byQuadrant);
+        return `<div class="due-head">${lab}<span>${items.length}</span></div><div>${items.map(candRow).join("")}</div>`;
+      }).join("");
+    }
+  } else {
+    const rtypeGroups = [["routine","ルーティン"],["skill","スキル"]];
+    const present = rtypeGroups.filter(([key])=>cands.some(t=>(t.rtype||"routine")===key));
+    body = present.map(([key,label])=>{
+      const items = cands.filter(t=>(t.rtype||"routine")===key).sort(byCreated);
+      return `<div class="due-head">${label}<span>${items.length}</span></div><div>${items.map(candRow).join("")}</div>`;
+    }).join("");
+  }
+
+  openSheet(`<div class="sheet-sticky-block">
+      <div class="sheet-sticky-head">
+        <h2>タスクを配置</h2>
+        <div class="sheet-sticky-actions">
+          <button class="btn tiny ghost" data-act="close-sheet">キャンセル</button>
+        </div>
+      </div>
+      <p class="sheet-sub">登録ずみのタスクから選びます。次の画面で開始時刻を指定してから配置されます。同じタスクを時間を変えて複数回配置することもできます。</p>
+      <div class="seg" style="margin:0 0 6px">
+        <button class="${view==="single"?"on":""}" data-act="tpl-pick-view" data-v="single">完了型</button>
+        <button class="${view==="repeat"?"on":""}" data-act="tpl-pick-view" data-v="repeat">継続型</button>
+      </div>
+      ${sortUI}
+    </div>
+    <div>${body}</div>`);
 }
 
 /* -- タスクを配置する前の開始時刻入力。v3.83のToDoリスト追加（sheetAddOcc）
-   と同じく、空欄のままなら「時間未定」として配置する（v3.177〜。以前は
-   開始時刻を必須にしていたが、時間を決めずにまず配置しておきたい場合に
-   対応できなかったため緩和した）。 -- */
+   と同じ見た目・項目（開始〜終了・空欄可・クリア）にした（v3.179〜。
+   以前は所要を直接の数値入力で聞いていたが、終了時刻から算出する方式に
+   揃えた）。空欄のままなら「時間未定」として配置する（v3.177〜）。 -- */
 function sheetTplTaskTime(taskId){
   const task = db.tasks.find(t=>t.id===taskId);
   if(!task) return;
-  openSheet(`<h2>${esc(task.name)} を配置</h2>
+  openSheet(`<h2>${esc(task.name)}</h2>
     <p class="sheet-sub">開始時刻を入れると時間割に置かれます。空欄なら「時間未定」で配置。</p>
-    <div class="row2">
-      <label class="fld"><span>開始（時刻・空欄可）</span><input type="time" id="ttStart"></label>
-      <label class="fld"><span>所要（分・任意）</span><input type="number" id="ttMin" inputmode="numeric" value="${task.estMin ?? ""}" min="1" placeholder="分"></label>
-    </div>
+    <label class="fld"><span>開始 〜 終了（空欄可）</span></label>
+    ${timeRow("開始", "ttStart", "")}
+    ${timeRow("終了", "ttEnd", "", '<button type="button" class="mini-clear" data-act="tt-clear-time">クリア</button>')}
     <div class="sheet-actions">
       <button class="btn ghost" data-act="close-sheet">キャンセル</button>
       <button class="btn primary" data-act="tpl-task-confirm" data-id="${taskId}">追加</button>
     </div>`);
 }
 
-/* -- 予定の行を追加: タイトル・開始・終了(所要) をこの画面でまとめて入力する
-   （以前は開始時刻だけ聞いて、名前・終了はあとで行を直接編集する必要があった） -- */
+/* -- 予定の行を追加。v3.179: 「普段の＋ボタンの『予定を追加』『ToDoリスト
+   に追加』と同じような仕様にして（押した後の画面を同じにする）」との指示で、
+   通常の予定追加（sheetMarker）と同じ項目（内容／開始〜終了／カテゴリ／
+   自由時間チェック／備考）をこの場で入力できるようにした——以前はタイトルと
+   時間しか聞けず、カテゴリ・自由時間・備考はあとで行を直接編集する必要が
+   あった。時間の既定値（直前の行の1時間後）はテンプレ特有の便利機能なので
+   そのまま残す。 -- */
 function sheetTplPlanTime(){
   const draft = state._tplDraft;
   const last = draft && draft.plans.length ? draft.plans[draft.plans.length-1] : null;
@@ -3529,15 +3592,21 @@ function sheetTplPlanTime(){
     dflt = `${pad((h+1)%24)}:${pad(m)}`;
   }
   openSheet(`<h2>予定を追加</h2>
-    <label class="fld"><span>タイトル</span><input type="text" id="tpName" placeholder="例: 仕事 / 睡眠"></label>
-    <label class="fld"><span>開始 〜 終了・所要</span></label>
-    <div class="time-row">
-      <input type="time" id="tpStart" value="${esc(dflt)}">
-      <span class="tr-sep">〜</span>
-      <input type="time" id="tpEnd">
-      <input type="number" id="tpMin" inputmode="numeric" min="1" placeholder="分">
+    <p class="sheet-sub">その時間なにをしているかの表示です。完了などのチェックはつきません（例: 美容院、来客、外出）。</p>
+    <label class="fld"><span>内容</span><input type="text" id="tpName" placeholder="例: 仕事 / 睡眠"></label>
+    <label class="fld"><span>開始 〜 終了（空欄可）</span></label>
+    ${timeRow("開始", "tpStart", dflt)}
+    ${timeRow("終了", "tpEnd", "", '<button type="button" class="mini-clear" data-act="tp-clear-span">クリア</button>')}
+    <p class="sheet-sub" style="margin-top:2px">両方空欄なら「時点」の予定。</p>
+    <label class="fld"><span>カテゴリ</span></label>
+    <div class="radio-row" id="tpCat">
+      ${CATS.map(c=>`<button data-v="${c}" class="${c==="その他"?"on":""}">${c}</button>`).join("")}
     </div>
-    <p class="sheet-sub" style="margin-top:2px">終了か所要のどちらかでよい（両方入れたら終了を優先）。両方空欄なら「時点」の予定。どの項目もあとで行を直接編集して直せます。</p>
+    <label class="fld" style="display:flex;align-items:center;gap:8px;margin-top:14px">
+      <input type="checkbox" id="tpFree" style="width:18px;height:18px;flex:none">
+      <span>自由時間として扱う（タイムラインには残るが、「ひと段落」の提案ではこの時間帯も空き扱いにする）</span>
+    </label>
+    <label class="fld"><span>備考（任意）</span>${noteTextarea("tpNote", "", "補足など")}</label>
     <div class="sheet-actions">
       <button class="btn ghost" data-act="close-sheet">キャンセル</button>
       <button class="btn primary" data-act="tpl-plan-confirm">追加</button>
@@ -4451,16 +4520,24 @@ document.addEventListener("click", e=>{
     }
     case "tpl-plan-confirm": {
       const draft = state._tplDraft; if(!draft) break;
-      const st = document.getElementById("tpStart")?.value;
-      if(!st){ document.getElementById("tpStart").focus(); toast("開始時刻を入力してください"); break; }
       const name = (document.getElementById("tpName")?.value || "").trim();
+      if(!name){ document.getElementById("tpName").focus(); break; }
+      const st = document.getElementById("tpStart")?.value;
+      if(!st){ document.getElementById("tpStart").focus(); toast("開始時刻を入れてください"); break; }
       const end = (document.getElementById("tpEnd")?.value || "").trim();
-      const rawMin = (document.getElementById("tpMin")?.value || "").trim();
-      let mins = end ? durFromEnd(st, end) : (rawMin === "" ? null : (parseInt(rawMin,10) || null));
+      let mins = end ? durFromEnd(st, end) : null;
       if(mins === 0) mins = null;
-      draft.plans.push({ time:st, label:name, mins, category:"", note:"" });
+      const cat = document.querySelector("#tpCat button.on")?.dataset.v || "その他";
+      const note = (document.getElementById("tpNote")?.value || "").trim();
+      const freeBlock = !!document.getElementById("tpFree")?.checked;
+      draft.plans.push({ time:st, label:name, mins, category:cat, freeBlock, note });
       sortBlocks(draft.plans);
       closeSheet(); render(); break;
+    }
+    case "tp-clear-span": {
+      const e = document.getElementById("tpEnd");
+      if(e) e.value = "";
+      break;
     }
     case "tpl-del-row": {
       readTplEditor();
@@ -4480,12 +4557,28 @@ document.addEventListener("click", e=>{
       sheetTplTaskPick();
       break;
     }
+    case "tpl-pick-view": { state.tplPickView = v; sheetTplTaskPick(); break; }
+    case "tpl-pick-sort": { state.tplPickSort = v; sheetTplTaskPick(); break; }
     case "tpl-task-pick": sheetTplTaskTime(id); break;
+    case "tt-clear-time": {
+      const s = document.getElementById("ttStart"), e = document.getElementById("ttEnd");
+      if(s) s.value = ""; if(e) e.value = "";
+      break;
+    }
     case "tpl-task-confirm": {
       const draft = state._tplDraft; if(!draft) break;
-      const st = document.getElementById("ttStart")?.value || null;   // 空欄なら時間未定
-      const rawMin = (document.getElementById("ttMin")?.value || "").trim();
-      const mins = rawMin === "" ? null : (parseInt(rawMin,10) || null);
+      const t = db.tasks.find(x=>x.id===id);
+      // v3.179: sheetAddOcc/add-todayと同じ考え方——開始が空欄なら時間未定、
+      // 開始があれば終了から所要を算出し、終了も空欄ならタスクの目安時間を使う。
+      const st = document.getElementById("ttStart")?.value || null;
+      let mins;
+      if(st){
+        const end = (document.getElementById("ttEnd")?.value || "").trim();
+        mins = end ? durFromEnd(st, end) : (t?.estMin ?? null);
+        if(mins === 0) mins = null;
+      } else {
+        mins = (t?.estMin ?? null);
+      }
       draft.tasks = draft.tasks || [];
       draft.tasks.push({ taskId:id, time:st, mins });
       closeSheet(); render(); break;
@@ -4698,9 +4791,13 @@ function readTplEditor(){
   if(!document.getElementById("tplForm")) return;   // not in the edit view
   const nameEl = document.getElementById("tplName");
   if(nameEl) draft.name = nameEl.value.trim() || draft.name;
-  // 予定 rows
+  // 予定 rows。v3.179: カテゴリは「予定を追加」の時点（sheetTplPlanTime）で
+  // 選ぶだけで、行の直接編集では出していない（自由時間・備考のような専用
+  // 入力欄が無い）ので、既存の下書きの値をそのまま引き継ぐ——ここで毎回
+  // category:"" に上書きすると、追加時に選んだカテゴリが次の編集操作
+  // （行の追加・削除など、どれもreadTplEditor()を経由する）で消えてしまう。
   const planLines = [...document.querySelectorAll("#tplEditor .tpl-line")];
-  draft.plans = planLines.map(line=>{
+  draft.plans = planLines.map((line,i)=>{
     const time    = line.querySelector('[data-f="time"]').value || "00:00";
     const end     = (line.querySelector('[data-f="end"]').value || "").trim();
     const rawMins = (line.querySelector('[data-f="mins"]').value || "").trim();
@@ -4708,7 +4805,8 @@ function readTplEditor(){
     if(mins === 0) mins = null;
     const free = !!line.querySelector('[data-f="free"]')?.checked;
     const note = (line.querySelector('[data-f="note"]')?.value || "").trim();
-    return { time, label: line.querySelector('[data-f="label"]').value.trim(), mins, category:"", freeBlock: free, note };
+    const category = (draft.plans[i] && draft.plans[i].category) || "";
+    return { time, label: line.querySelector('[data-f="label"]').value.trim(), mins, category, freeBlock: free, note };
   });
   // task placements。v3.177: 予定(plans)行とは違い、タスクの配置は開始時刻を
   // 空欄のまま（時間未定）にできるので、"00:00"を補わずそのまま空欄を保つ。
