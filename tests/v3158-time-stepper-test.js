@@ -87,40 +87,80 @@ function dispatchClick(dataAct, extra){
   return t;
 }
 
-// v3.158-1: timeRow()が開始/終了それぞれ用に、ラベル+(-5)(-1)[入力](+1)(+5)を
-// 正しいdata-idで出す。
+// time-step-signは、押された自分自身(el)のdataset/textContentを直接書き換える
+// 実装なので、呼び出すたびに使い捨てのmkEl()を渡すdispatchClick()では、実際に
+// 画面に居続ける＜inputId＞Sign要素とは別物を書き換えてしまい、次のtime-step
+// から見えない——必ずgetEl(inputId+"Sign")という「永続する同じオブジェクト」
+// をクリック対象にする専用ヘルパーを使う。
+function clickSignToggle(inputId){
+  const t = getEl(inputId + "Sign");
+  t.dataset.act = "time-step-sign";
+  t.dataset.id = inputId;
+  t.closest = function(sel){ if(sel === "[data-act]") return t; return null; };
+  const evt = { target: t, preventDefault(){}, stopPropagation(){} };
+  clickListeners.forEach(fn=>fn(evt));
+  return t;
+}
+
+// v3.180-1: timeRow()が開始/終了それぞれ用に、ラベル＋方向トグル(＋)＋
+// 移動量ボタン(1/5/30)を正しいdata-idで出す（-5/-1/+1/+5の4ボタンから、
+// 「方向トグル1つ＋1/5/30の3つ」の計4ボタンに置き換え）。
 {
   const html = T.timeRow("開始", "oeStart", "09:00");
   ok("has the label", html.includes(">開始<"));
   ok("has the time input with id/value", html.includes('id="oeStart"') && html.includes('value="09:00"'));
-  ok("has all four stepper buttons pointed at the same id",
-    ['-5','-1','1','5'].every(d => html.includes(`data-act="time-step" data-id="oeStart" data-v="${d}"`)));
+  ok("has a sign-toggle button defaulting to +", /id="oeStartSign"[^>]*data-sign="1"[^>]*>\+</.test(html));
+  ok("has the three magnitude buttons (1/5/30) pointed at the same id",
+    ['1','5','30'].every(d => html.includes(`data-act="time-step" data-id="oeStart" data-v="${d}"`)));
+  ok("no longer has negative data-v buttons", !html.includes('data-v="-5"') && !html.includes('data-v="-1"'));
 }
 
-// v3.158-2: time-stepクリックで指定分だけ時刻がずれる（通常のケース）。
+// v3.180-2: 既定（＋方向）でのtime-stepクリックで指定分だけ時刻が進む。
 {
   const inp = getEl("oeStart");
   inp.value = "09:00";
   dispatchClick("time-step", { id:"oeStart", v:"5" });
   ok("+5 moves 09:00 to 09:05", inp.value === "09:05");
 
-  dispatchClick("time-step", { id:"oeStart", v:"-1" });
-  ok("-1 moves 09:05 to 09:04", inp.value === "09:04");
+  dispatchClick("time-step", { id:"oeStart", v:"1" });
+  ok("+1 moves 09:05 to 09:06", inp.value === "09:06");
 }
 
-// v3.170: 分のボタンは分だけを0〜59の中で巡回させ、時は変えない
-// （「分の微調整のつもりで時まで繰り上がると紛らわしい」との指示でv3.158
-// 当時の24時またぎ折り返し仕様を変更——以前は total%1440 で時までまたいで
-// いたが、今は時はそのまま分だけをmod 60する）。
+// v3.180-3: 方向トグル(time-step-sign)を押すと＋／－が切り替わり、以後の
+// time-stepはその方向で動く。
+{
+  const signBtn = getEl("oeStartSign");
+  signBtn.dataset.sign = "1"; signBtn.textContent = "+";
+  clickSignToggle("oeStart");
+  ok("tapping the sign toggle flips it to -", signBtn.dataset.sign === "-1");
+  ok("the toggle's own label shows − after flipping", signBtn.textContent === "−");
+
+  const inp = getEl("oeStart");
+  inp.value = "09:06";
+  dispatchClick("time-step", { id:"oeStart", v:"5" });
+  ok("with the toggle flipped to -, pressing 5 moves backward (09:06 -> 09:01)", inp.value === "09:01");
+
+  clickSignToggle("oeStart");
+  ok("tapping the toggle again flips it back to +", signBtn.dataset.sign === "1");
+  ok("the toggle's own label shows + after flipping back", signBtn.textContent === "+");
+}
+
+// v3.180-4: 「残業で後ろ倒し」を想定した30分移動。時をまたぐ場合も正しく
+// 繰り上がる（以前のv3.170仕様は分だけをmod 60し時を変えなかったが、
+// 30分移動は時をまたぐのが前提のため、時もまたぐように変更した）。
 {
   const inp = getEl("oeEnd");
-  inp.value = "23:58";
-  dispatchClick("time-step", { id:"oeEnd", v:"5" });
-  ok("23:58 +5 keeps the hour at 23, only the minute wraps (23:58 -> 23:03)", inp.value === "23:03");
+  const signBtn = getEl("oeEndSign");
+  signBtn.dataset.sign = "1"; signBtn.textContent = "+";
 
-  inp.value = "00:02";
-  dispatchClick("time-step", { id:"oeEnd", v:"-5" });
-  ok("00:02 -5 keeps the hour at 00, only the minute wraps (00:02 -> 00:57)", inp.value === "00:57");
+  inp.value = "23:50";
+  dispatchClick("time-step", { id:"oeEnd", v:"30" });
+  ok("23:50 +30 correctly carries into the next hour (-> 00:20)", inp.value === "00:20");
+
+  inp.value = "00:10";
+  clickSignToggle("oeEnd");
+  dispatchClick("time-step", { id:"oeEnd", v:"30" });
+  ok("00:10 -30 correctly borrows from the previous hour (-> 23:40)", inp.value === "23:40");
 }
 
 // v3.158-4: 時刻が未入力(空欄)のときはエラーにならず何もしない

@@ -848,6 +848,10 @@
     font-family:var(--font-mono);font-variant-numeric:tabular-nums;
   }
   .ts-btn:active{background:var(--surface-2)}
+  /* v3.180: 方向トグル（＋／－）は、1/5/30のような一度押しの移動ボタンとは
+     違い「今どちら向きか」を常に示す状態そのものなので、選択中チップ
+     （.chip.solid等）と同じ塗りで一目で分かるようにする。 */
+  .ts-btn.ts-sign{background:var(--wash);border-color:transparent;color:var(--primary-ink);font-weight:700;font-size:15px}
   .time-row input[type="time"]{height:38px;min-height:38px;width:82px;padding:0 6px;box-sizing:border-box;flex:none;font-family:var(--font-mono)}
   .time-row input[type="number"]{height:38px;min-height:38px;width:52px;padding:0 6px;box-sizing:border-box;flex:none}
   .mini-x{width:26px;height:26px;border-radius:7px;border:1px solid var(--hairline);display:grid;place-items:center;color:var(--muted);flex:none}
@@ -1032,7 +1036,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.179";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.180";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1213,14 +1217,22 @@ const settings = () => (db.settings || (db.settings = {}));
 // v3.159: 時刻入力は元の固定サイズに戻し左側に置く。調整ボタンは
 // その右へ4つまとめて並べる（-5/-1/+1/+5の順）。extraHTMLで、終了側の
 // 行にだけ「クリア」ボタンを同じ行に収める。
+// v3.180: 「残業で後ろ倒しになったとき、30分まとめてずらしたい」との指示。
+// ボタン数を増やさずに30分移動を足すため、固定の+/-4ボタンから
+// 「方向を切り替えるトグル1つ＋移動量ボタン(1/5/30)3つ」の計4ボタンに
+// 置き換えた——方向はこのトグル（押すたびに＋／－を切り替える、既定は＋）
+// 側だけが持ち、1/5/30ボタンはその時点の方向でその分数だけ動かす。
+// あわせて、時だけ固定して分を0〜59で巡回させていた（v3.170）挙動もやめ、
+// 時を跨ぐ移動（例: 23:50に+30→翌0:20）も正しく繰り上がるようにした——
+// 「30分まとめてずらす」という使い方そのものが時をまたぐ前提のため。
 function timeRow(label, inputId, value, extraHTML){
   return `<div class="time-stepper-row">
     <span class="ts-label">${esc(label)}</span>
     <input type="time" id="${inputId}" value="${esc(value||"")}">
-    <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="-5">−5</button>
-    <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="-1">−1</button>
-    <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="1">+1</button>
-    <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="5">+5</button>
+    <button type="button" class="ts-btn ts-sign" id="${inputId}Sign" data-act="time-step-sign" data-id="${inputId}" data-sign="1">+</button>
+    <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="1">1</button>
+    <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="5">5</button>
+    <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="30">30</button>
     ${extraHTML||""}
   </div>`;
 }
@@ -4300,21 +4312,27 @@ document.addEventListener("click", e=>{
       toast("時間をクリアしました（保存で確定）");
       break;
     }
-    // v3.158: 開始・終了それぞれの時刻入力の両脇にある±1分/±5分ボタン。
-    // 対象の時刻欄の現在値にdata-v分だけ加減し、24時をまたぐ場合は
-    // 日をまたいだ時刻として折り返す（ネイティブtime入力の仕様に合わせる）。
+    // v3.158: 開始・終了それぞれの時刻入力の脇にある移動ボタン。
     // render()は呼ばない——入力中の他の項目を消さないため。
+    // v3.180: 「＋／－の方向トグル」＋「1/5/30分」の組み合わせに変更
+    // （経緯はtimeRow()のコメント参照）。方向は同じ欄に付くトグル
+    // ボタン（id="<inputId>Sign"）のdata-signで持つ。時またぎも
+    // 正しく繰り上がる（0〜1439分の範囲で巡回）。
     case "time-step": {
       const inp = document.getElementById(id);
       if(!inp || !inp.value) break;
+      const signBtn = document.getElementById(id + "Sign");
+      const sign = (signBtn && signBtn.dataset.sign === "-1") ? -1 : 1;
       const [hh,mm] = inp.value.split(":").map(Number);
-      const delta = parseInt(v, 10) || 0;
-      // v3.170: 分のボタン(-5/-1/+1/+5)は分だけを0〜59の中で巡回させ、時は
-      // 変えない——「ネイティブピッカーで大まかに時間を合わせてから、ボタンで
-      // 分だけ微調整する」という元々の使い方で、分の微調整のつもりで時まで
-      // 繰り上がってしまうと紛らわしいとの指示。
-      const newMm = ((mm + delta) % 60 + 60) % 60;
-      inp.value = pad(hh) + ":" + pad(newMm);
+      const delta = sign * (parseInt(v, 10) || 0);
+      const total = ((hh*60 + mm + delta) % 1440 + 1440) % 1440;
+      inp.value = pad(Math.floor(total/60)) + ":" + pad(total%60);
+      break;
+    }
+    case "time-step-sign": {
+      const next = el.dataset.sign === "-1" ? "1" : "-1";
+      el.dataset.sign = next;
+      el.textContent = next === "-1" ? "−" : "+";
       break;
     }
     case "save-occ": {
