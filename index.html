@@ -929,6 +929,15 @@
      パッと見で何の設定か分かりにくいという指摘を受け、このシートの項目名だけ
      太字にする（他のシートの.fldラベルには影響させない、スコープを絞った指定）。 */
   .tk-form label.fld > span{font-weight:700;color:var(--ink)}
+  /* v3.181: タスク登録・編集シートは項目数が多く、「毎回必ず判断してほしい
+     項目」と「大体既定値のままで良い項目」が同じ見た目で並んでいて目が
+     迷うとの指摘。太字（上のv3.125）はラベルと値を区別するためのもので
+     「重要度」を示す意図ではないため変更しない——その代わり、本当に毎回
+     見てほしい項目（タイトル／タスクの型／重要度／種類）だけを薄い色の
+     背景パネルで囲み、浮いて見えるようにする。他の項目の見た目は一切
+     変えない（選ばれているチップ.chip.solidと同じ配色を流用）。 */
+  .fld-highlight{background:var(--wash);border-radius:11px;padding:10px 11px 12px;margin-top:11px}
+  .fld-highlight > .fld:first-child{margin-top:0}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .radio-row{display:flex;gap:7px;flex-wrap:wrap}
   .radio-row button{
@@ -1036,7 +1045,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.180";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.181";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1304,6 +1313,9 @@ function migrate(d){
     if(t.duePrec == null) t.duePrec = "day";
     if(t.startPrec == null) t.startPrec = "day";
     if(t.kind==="repeat" && t.rtype == null) t.rtype = "routine";
+    // v3.181: MyQuest連携用の「負荷の重み」。旧データ（この項目を持たない）
+    // には既定値を補う——完了型は3択の既定「5」、継続型は自由入力の既定「10」。
+    if(t.weight == null) t.weight = t.kind==="repeat" ? 10 : 5;
   });
   // v3.102: v3.100で進捗メモの参照先を「今日の実施」から「一番新しい実施」に
   // 変えたが、それより前（またはv3.101のcarry-forward修正が効く前）に空の
@@ -3910,11 +3922,15 @@ function sheetTask(taskId){
       </div>
     </div>
     <div class="tk-form">
+    <div class="fld-highlight">
     <label class="fld"><span>タイトル</span><input type="text" id="tkName" value="${esc(t?.name||"")}" placeholder="例: 資格勉強"></label>
+    </div>
+    <div class="fld-highlight">
     <label class="fld"><span>タスクの型</span></label>
     <div class="radio-row" id="tkKind">
       <button data-v="single" class="${kind==="single"?"on":""}">完了型</button>
       <button data-v="repeat" class="${kind==="repeat"?"on":""}">継続型</button>
+    </div>
     </div>
     <div id="tkFreqWrap" style="${kind==="repeat"?"":"display:none"}">
       <label class="fld"><span>頻度</span></label>
@@ -3926,18 +3942,31 @@ function sheetTask(taskId){
         </span>
         <span style="align-self:center;color:var(--muted);font-size:13px;${ftype==="perWeek"?"":"display:none"}" id="tkNlbl">回 / 週</span>
       </div>
+      <div class="fld-highlight">
       <label class="fld"><span>種類</span></label>
       <div class="radio-row" id="tkRtype">
         <button data-v="skill" class="${(t?.rtype||"routine")==="skill"?"on":""}">スキル</button>
         <button data-v="routine" class="${(t?.rtype||"routine")==="routine"?"on":""}">ルーティン</button>
       </div>
+      </div>
+      <label class="fld"><span>ポイント（任意・連携アプリ用。この継続タスク1回ぶんの負荷の目安）</span>
+        <input type="number" id="tkPoints" class="short" inputmode="numeric" value="${t?.weight ?? 10}" min="0" placeholder="10">
+      </label>
     </div>
     <div id="tkPrioWrap" style="${kind==="single"?"":"display:none"}">
+      <div class="fld-highlight">
       <label class="fld"><span>重要度</span></label>
       <div class="radio-row" id="tkPrio">
         <button data-v="high" class="${(t?.prio||"low")==="high"?"on":""}">高</button>
         <button data-v="mid" class="${(t?.prio||"low")==="mid"?"on":""}">中</button>
         <button data-v="low" class="${(t?.prio||"low")==="low"?"on":""}">無</button>
+      </div>
+      </div>
+      <label class="fld"><span>重み（任意・連携アプリ用。このタスク1回ぶんの負荷の目安）</span></label>
+      <div class="radio-row" id="tkWeight">
+        <button data-v="5" class="${(t?.weight ?? 5)===5?"on":""}">5</button>
+        <button data-v="10" class="${(t?.weight ?? 5)===10?"on":""}">10</button>
+        <button data-v="15" class="${(t?.weight ?? 5)===15?"on":""}">15</button>
       </div>
     </div>
     <label class="fld"><span>カテゴリ</span></label>
@@ -4005,12 +4034,22 @@ function saveTaskFromForm(id){
     const ft = document.querySelector("#tkFreq button.on")?.dataset.v || "daily";
     freq = ft==="perWeek" ? { type:"perWeek", n: parseInt(document.getElementById("tkNv").textContent,10)||3 } : { type:"daily" };
   }
+  // v3.181: MyQuest連携用の「負荷の重み」。完了型は3択（5/10/15、既定5）、
+  // 継続型は自由入力の整数（既定10、上下限なし）——どちらも最終的には
+  // 同じt.weight（整数）に収まる。
+  let weight;
+  if(kind==="single"){
+    weight = parseInt(document.querySelector("#tkWeight button.on")?.dataset.v, 10) || 5;
+  } else {
+    const rawW = (document.getElementById("tkPoints")?.value || "").trim();
+    weight = rawW === "" ? 10 : (parseInt(rawW,10) || 0);
+  }
   let t;
   if(id){
     t = db.tasks.find(x=>x.id===id);
-    Object.assign(t, { name, kind, estMin, category:cat, freq, note, due, duePrec, prio, startDate, startPrec, rtype });
+    Object.assign(t, { name, kind, estMin, category:cat, freq, note, due, duePrec, prio, startDate, startPrec, rtype, weight });
   } else {
-    t = { id:uid(), name, kind, freq, estMin, category:cat, note, due, duePrec, prio, startDate, startPrec, rtype, done:false, createdAt:todayStr() };
+    t = { id:uid(), name, kind, freq, estMin, category:cat, note, due, duePrec, prio, startDate, startPrec, rtype, weight, done:false, createdAt:todayStr() };
     db.tasks.push(t);
   }
   // v3.66: 今日の実施の進捗メモ（あれば）も一緒に保存 — ToDoリストのカードの
@@ -5027,10 +5066,14 @@ function todaysTimedTasks(){
 function sendTaskEvent(o, type){
   const task = o.taskId || o.id;
   const title = occName(o).slice(0, 100);
+  // v3.181: タスクに登録した「重み」（完了型は5/10/15の3択、継続型は自由入力の
+  // 整数）をそのまま載せる——MyQuest側のポイント判定（タスク名の一致表＋
+  // それ以外は固定値）を、LifeCore側の明示的な値に置き換えるための連携。
+  const weight = taskOf(o)?.weight ?? null;
   const at = new Date().toISOString();
   fetch(PUSH_SERVER + "/task-event", {
     method:"POST", headers:{ "Content-Type":"application/json", "X-LifeCore-Token": PUSH_SHARED_TOKEN },
-    body: JSON.stringify({ id:o.id, type, task, title, at }),
+    body: JSON.stringify({ id:o.id, type, task, title, weight, at }),
   }).then(res=>dbg("[myquest] task event:", type, res.status)).catch(e=>dbg("[myquest] task event failed:", e.message));
 }
 

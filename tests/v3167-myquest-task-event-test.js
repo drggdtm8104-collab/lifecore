@@ -142,5 +142,24 @@ dispatchClick(fakeTarget("toggle-occ-unmet", "occ4"));
 call = fetchCalls.find(c => c.url.endsWith("/task-event"));
 ok("marking 未達成 (skipped) does not post to /task-event", !call);
 
+// -------- 6 (v3.181): the task's registered "weight" (MyQuest point value) rides along --------
+T.db.tasks.push({ id:"t3", name:"筋トレ", kind:"repeat", freq:{type:"daily"}, category:"運動",
+  note:"", due:null, prio:"low", startDate:null, rtype:"skill", done:false, createdAt:"2026-10-19", weight:15 });
+T.db.occurrences.push({ id:"occ5", taskId:"t3", date:"2026-10-19", plannedStart:null, plannedMin:null,
+  actualMin:null, status:"planned", doneAt:null, adhoc:false, title:null, note:"", plan:false });
+fetchCalls = [];
+dispatchClick(fakeTarget("toggle-occ-done", "occ5"));
+call = fetchCalls.find(c => c.url.endsWith("/task-event"));
+payload = call ? JSON.parse(call.opts.body) : null;
+ok("the task's registered weight is included in the payload", payload && payload.weight === 15);
+
+// -------- 7 (v3.181): a task with no weight set (e.g. pre-migration data in this test's
+// hand-built fixtures) sends weight:null rather than throwing or omitting the key --------
+fetchCalls = [];
+dispatchClick(fakeTarget("toggle-occ-done", "occ1"));   // t1 ("皿洗い") was built above with no weight field
+call = fetchCalls.find(c => c.url.endsWith("/task-event"));
+payload = call ? JSON.parse(call.opts.body) : null;
+ok("a task without a registered weight sends weight:null", payload && payload.weight === null);
+
 console.log(fail === 0 ? "\nALL PASS" : `\n${fail} FAILURES`);
 process.exit(fail ? 1 : 0);

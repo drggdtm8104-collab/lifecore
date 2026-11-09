@@ -220,6 +220,38 @@ async function main(){
     ok("the old subscriptions were actually deleted", !env.SUBS._store.has("sub:old1") && !env.SUBS._store.has("sub:old2"));
   }
 
+  // -------- Test 10 (v3.181): /task-eventは新しい"weight"（MyQuest用のポイント／
+  // 負荷の重み）を検証し、MyQuestへの転送本文にもそのまま載せる——未指定なら
+  // nullとして転送、整数以外（例: 小数）なら400で弾き転送もしない。 --------
+  {
+    const realFetch = global.fetch;
+    let forwardedBody = null;
+    global.fetch = async (url, opts) => { forwardedBody = JSON.parse(opts.body); return { ok: true }; };
+    const env = { SHARED_SECRET: "secret123", SUBS: mkKvMock({}), MYQUEST_CLIENT_ID: "x", MYQUEST_CLIENT_SECRET: "y" };
+    const mkReq = (body) => ({
+      url: "https://lifecore-push.example.workers.dev/task-event",
+      method: "POST",
+      headers: { get: (name) => (name === "X-LifeCore-Token" ? "secret123" : null) },
+      json: async () => body,
+    });
+
+    const res1 = await mod.default.fetch(mkReq({ id:"occ1", type:"task.completed", task:"t1", title:"筋トレ", weight:15, at:new Date().toISOString() }), env);
+    ok("a valid integer weight is accepted (200)", res1.status === 200);
+    ok("the integer weight is forwarded to MyQuest unchanged", forwardedBody && forwardedBody.weight === 15);
+
+    forwardedBody = null;
+    const res2 = await mod.default.fetch(mkReq({ id:"occ2", type:"task.completed", task:"t1", title:"筋トレ", at:new Date().toISOString() }), env);
+    ok("an omitted weight is accepted (200)", res2.status === 200);
+    ok("an omitted weight is forwarded as null", forwardedBody && forwardedBody.weight === null);
+
+    forwardedBody = null;
+    const res3 = await mod.default.fetch(mkReq({ id:"occ3", type:"task.completed", task:"t1", title:"筋トレ", weight:1.5, at:new Date().toISOString() }), env);
+    ok("a non-integer weight is rejected (400)", res3.status === 400);
+    ok("a rejected request is never forwarded to MyQuest", forwardedBody === null);
+
+    global.fetch = realFetch;
+  }
+
   console.log(fail === 0 ? "\nALL PASS" : `\n${fail} FAILURES`);
   process.exit(fail ? 1 : 0);
 }
