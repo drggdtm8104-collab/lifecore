@@ -174,23 +174,26 @@ delete radioSelections.tkKind;
   ok("旧・継続型タスクの既定weightは10", b && b.weight === 10);
 }
 
-// -------- 7. 登録シート: 目立たせる対象（タイトル・タスクの型・重要度・種類）
-//            だけが.fld-highlightで囲まれている --------
+// -------- 7 (v3.182): 登録シート: 目立たせる対象（タイトル・タスクの型・
+//            重要度・種類）の項目名だけがfld-label-hlクラス付きで出る
+//            （v3.181の「項目全体を背景パネルで囲む」方式は、選択中の
+//            ボタンの配色と衝突して見づらくなったため撤回・変更ずみ）。 --------
 radioSelections.tkKind = "single";
 T.sheetTask(null);
 {
   const html = sheetEl.innerHTML;
-  ok("タイトルがfld-highlightの中にある", /fld-highlight[\s\S]{0,80}タイトル/.test(html));
-  ok("タスクの型がfld-highlightの中にある", /fld-highlight[\s\S]{0,80}タスクの型/.test(html));
-  ok("重要度がfld-highlightの中にある", /fld-highlight[\s\S]{0,80}重要度/.test(html));
-  ok("カテゴリはfld-highlightの外（装飾なし）", !/fld-highlight[\s\S]{0,40}カテゴリ/.test(html));
+  ok("タイトルのラベルにfld-label-hlが付く", /<span class="fld-label-hl">タイトル<\/span>/.test(html));
+  ok("タスクの型のラベルにfld-label-hlが付く", /<span class="fld-label-hl">タスクの型<\/span>/.test(html));
+  ok("重要度のラベルにfld-label-hlが付く", /<span class="fld-label-hl">重要度<\/span>/.test(html));
+  ok("カテゴリのラベルにはfld-label-hlが付かない（装飾なし）", /<span>カテゴリ<\/span>/.test(html) && !/<span class="fld-label-hl">カテゴリ<\/span>/.test(html));
+  ok("重みの入力欄・ボタン列自体は背景パネルで囲まれていない（fld-highlightは廃止）", !html.includes("fld-highlight"));
 }
 radioSelections.tkKind = "repeat";
 T.sheetTask(null);
 {
   const html = sheetEl.innerHTML;
-  ok("種類（継続型）がfld-highlightの中にある", /fld-highlight[\s\S]{0,80}種類/.test(html));
-  ok("頻度はfld-highlightの外（装飾なし、対象に含まれていない）", !/fld-highlight[\s\S]{0,40}頻度/.test(html));
+  ok("種類（継続型）のラベルにfld-label-hlが付く", /<span class="fld-label-hl">種類<\/span>/.test(html));
+  ok("頻度のラベルにはfld-label-hlが付かない（対象外）", /<span>頻度<\/span>/.test(html) && !/<span class="fld-label-hl">頻度<\/span>/.test(html));
 }
 
 console.log(fail === 0 ? "\nALL PASS" : `\n${fail} FAILURES`);

@@ -98,7 +98,7 @@ T.state.date = today;
 // -------- 1. タスク登録シートの項目名が太字スコープ(.tk-form)の中にある --------
 T.sheetTask(null);
 ok("sheetTask() wraps its fields in .tk-form so the bold-label CSS scopes correctly", sheetEl.innerHTML.includes('class="tk-form"'));
-ok("the title field label is present inside the form", sheetEl.innerHTML.includes("<span>タイトル</span>"));
+ok("the title field label is present inside the form", /<span[^>]*>タイトル<\/span>/.test(sheetEl.innerHTML));
 
 // -------- 2. 「保存して追加」ボタンがあり、保存後は「ToDoリストに追加」で
 // タスクを選んだときと同じ、開始時刻を決める画面(sheetAddOcc)に続けて進む

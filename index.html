@@ -933,11 +933,17 @@
      項目」と「大体既定値のままで良い項目」が同じ見た目で並んでいて目が
      迷うとの指摘。太字（上のv3.125）はラベルと値を区別するためのもので
      「重要度」を示す意図ではないため変更しない——その代わり、本当に毎回
-     見てほしい項目（タイトル／タスクの型／重要度／種類）だけを薄い色の
-     背景パネルで囲み、浮いて見えるようにする。他の項目の見た目は一切
-     変えない（選ばれているチップ.chip.solidと同じ配色を流用）。 */
-  .fld-highlight{background:var(--wash);border-radius:11px;padding:10px 11px 12px;margin-top:11px}
-  .fld-highlight > .fld:first-child{margin-top:0}
+     見てほしい項目（タイトル／タスクの型／重要度／種類）だけ目立たせる。
+     v3.182: 当初は項目全体（入力欄・ボタン列まで）を薄い色の背景パネルで
+     囲んでいたが、選択中のボタン（同じ--washを使っている）がパネルの
+     背景に溶けて枠線が見えなくなり、逆に見づらくなってしまった。
+     項目「名」だけに色付きの背景（チップ風）を付ける方式に変更——
+     入力欄・ボタン列の見た目は一切変えない。 */
+  .tk-form label.fld > span.fld-label-hl{
+    display:inline-block;width:fit-content;
+    background:var(--wash);color:var(--primary-ink);
+    padding:2px 9px;border-radius:6px;
+  }
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .radio-row{display:flex;gap:7px;flex-wrap:wrap}
   .radio-row button{
@@ -1045,7 +1051,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.181";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.182";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3922,15 +3928,11 @@ function sheetTask(taskId){
       </div>
     </div>
     <div class="tk-form">
-    <div class="fld-highlight">
-    <label class="fld"><span>タイトル</span><input type="text" id="tkName" value="${esc(t?.name||"")}" placeholder="例: 資格勉強"></label>
-    </div>
-    <div class="fld-highlight">
-    <label class="fld"><span>タスクの型</span></label>
+    <label class="fld"><span class="fld-label-hl">タイトル</span><input type="text" id="tkName" value="${esc(t?.name||"")}" placeholder="例: 資格勉強"></label>
+    <label class="fld"><span class="fld-label-hl">タスクの型</span></label>
     <div class="radio-row" id="tkKind">
       <button data-v="single" class="${kind==="single"?"on":""}">完了型</button>
       <button data-v="repeat" class="${kind==="repeat"?"on":""}">継続型</button>
-    </div>
     </div>
     <div id="tkFreqWrap" style="${kind==="repeat"?"":"display:none"}">
       <label class="fld"><span>頻度</span></label>
@@ -3942,25 +3944,21 @@ function sheetTask(taskId){
         </span>
         <span style="align-self:center;color:var(--muted);font-size:13px;${ftype==="perWeek"?"":"display:none"}" id="tkNlbl">回 / 週</span>
       </div>
-      <div class="fld-highlight">
-      <label class="fld"><span>種類</span></label>
+      <label class="fld"><span class="fld-label-hl">種類</span></label>
       <div class="radio-row" id="tkRtype">
         <button data-v="skill" class="${(t?.rtype||"routine")==="skill"?"on":""}">スキル</button>
         <button data-v="routine" class="${(t?.rtype||"routine")==="routine"?"on":""}">ルーティン</button>
-      </div>
       </div>
       <label class="fld"><span>ポイント（任意・連携アプリ用。この継続タスク1回ぶんの負荷の目安）</span>
         <input type="number" id="tkPoints" class="short" inputmode="numeric" value="${t?.weight ?? 10}" min="0" placeholder="10">
       </label>
     </div>
     <div id="tkPrioWrap" style="${kind==="single"?"":"display:none"}">
-      <div class="fld-highlight">
-      <label class="fld"><span>重要度</span></label>
+      <label class="fld"><span class="fld-label-hl">重要度</span></label>
       <div class="radio-row" id="tkPrio">
         <button data-v="high" class="${(t?.prio||"low")==="high"?"on":""}">高</button>
         <button data-v="mid" class="${(t?.prio||"low")==="mid"?"on":""}">中</button>
         <button data-v="low" class="${(t?.prio||"low")==="low"?"on":""}">無</button>
-      </div>
       </div>
       <label class="fld"><span>重み（任意・連携アプリ用。このタスク1回ぶんの負荷の目安）</span></label>
       <div class="radio-row" id="tkWeight">
