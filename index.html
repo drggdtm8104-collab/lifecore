@@ -36,7 +36,6 @@
     --defer:#868C97;
     --over:#C62828;
     --wash:#E9F1EE;
-    --hl:#DD6B20;
     --shadow:0 1px 2px rgba(22,32,29,.05), 0 3px 12px rgba(22,32,29,.06);
     --radius:13px;
     --font-display:"Shippori Mincho","Yu Mincho","Hiragino Mincho ProN",serif;
@@ -66,7 +65,6 @@
     --defer:#868C97;
     --over:#EF5350;
     --wash:#182420;
-    --hl:#DD6B20;
     --shadow:0 1px 2px rgba(0,0,0,.40), 0 3px 14px rgba(0,0,0,.46);
   }
   :root[data-theme="sand"]{
@@ -75,7 +73,6 @@
     --ink:#1E2529; --muted:#5F6866; --faint:#98A19D; --hairline:#D2C9AE;
     --primary:#2F6F5E; --primary-ink:#22574A; --on-primary:#FFFFFF; --done:#2F6F5E;
     --partial:#A9791C; --defer:#868C97; --over:#C62828; --wash:#E9F1EE;
-    --hl:#DD6B20;
     --shadow:0 1px 2px rgba(40,35,20,.08), 0 3px 12px rgba(40,35,20,.09);
   }
   :root[data-theme="rosegrey"]{
@@ -84,7 +81,6 @@
     --ink:#1E2529; --muted:#5F6866; --faint:#98A19D; --hairline:#CBB9B8;
     --primary:#2F6F5E; --primary-ink:#22574A; --on-primary:#FFFFFF; --done:#2F6F5E;
     --partial:#A9791C; --defer:#868C97; --over:#C62828; --wash:#E9F1EE;
-    --hl:#DD6B20;
     --shadow:0 1px 2px rgba(40,25,24,.08), 0 3px 12px rgba(40,25,24,.09);
   }
   :root[data-theme="navy"]{
@@ -93,7 +89,6 @@
     --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#2E3A48;
     --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
     --partial:#D8A54A; --defer:#868C97; --over:#EF5350; --wash:#283530;
-    --hl:#DD6B20;
     --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
   }
   :root[data-theme="forest"]{
@@ -102,7 +97,6 @@
     --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#333C35;
     --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
     --partial:#D8A54A; --defer:#868C97; --over:#EF5350; --wash:#283530;
-    --hl:#DD6B20;
     --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
   }
   :root[data-theme="warmgrey"]{
@@ -111,7 +105,6 @@
     --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#3C3835;
     --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
     --partial:#D8A54A; --defer:#868C97; --over:#EF5350; --wash:#283530;
-    --hl:#DD6B20;
     --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
   }
 
@@ -956,14 +949,20 @@
      --hl / --hl-washの値を赤系に変更（トークン自体はv3.183で新設した
      ものを使い続け、値だけ差し替え）。
      v3.185: 「文字自体は白のままで背景だけ色を付けて。赤からオレンジ系に」
-     との指摘で、薄い色（--hl-wash）の上に濃い文字（--hl）を乗せる配色
-     から、濃い色（--hl、オレンジ系）を背景いっぱいに塗って白文字を乗せる
-     バッジ風の配色に変更。塗りが前面に出るため、7テーマで色を分ける
-     必要が無くなり（薄いwashのように背景色との馴染みを気にしなくて良い）、
-     --hlを全テーマ共通の1色に統一し、--hl-washは廃止した。 */
+     との指摘で、薄い色の上に濃い文字を乗せる配色から、濃い色（オレンジ系）
+     を背景いっぱいに塗って白文字を乗せるバッジ風の配色に変更。この時点
+     では既存トークンを使わず独自の色（--hl / --hl-wash）を新設していた。
+     v3.186: 「なんで急に系統の違う色の使い方をしちゃったの」との指摘——
+     v3.183〜v3.185はいずれも、既存の意味付きカラーと被らないようにする
+     ことを優先して専用の新色を作ってしまい、結果的にアプリの配色システム
+     （7テーマぶん調整済みの既存トークン）の外から色を持ち込む形になって
+     いた。これが「系統が違う」という指摘の原因。「重要度の色みたいな
+     オレンジに」との指示で、新色--hl/--hl-washは廃止し、重要度「中」と
+     同じ既存トークン--partial（期限間近の警告にも使われるオレンジ/金系、
+     7テーマぶん既に調整済み）を再利用する形に変更した。 */
   .tk-form label.fld > span.fld-label-hl{
     display:inline-block;width:fit-content;
-    background:var(--hl);color:#FFFFFF;
+    background:var(--partial);color:#FFFFFF;
     padding:2px 9px;border-radius:6px;
   }
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -1073,7 +1072,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.185";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.186";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
