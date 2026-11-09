@@ -36,8 +36,8 @@
     --defer:#868C97;
     --over:#C62828;
     --wash:#E9F1EE;
-    --hl:#1C5D99;
-    --hl-wash:#E7F0FA;
+    --hl:#C0392B;
+    --hl-wash:#FBE3E1;
     --shadow:0 1px 2px rgba(22,32,29,.05), 0 3px 12px rgba(22,32,29,.06);
     --radius:13px;
     --font-display:"Shippori Mincho","Yu Mincho","Hiragino Mincho ProN",serif;
@@ -67,8 +67,8 @@
     --defer:#868C97;
     --over:#EF5350;
     --wash:#182420;
-    --hl:#6EB5F0;
-    --hl-wash:#1B2A38;
+    --hl:#FF8A80;
+    --hl-wash:#3A1F1E;
     --shadow:0 1px 2px rgba(0,0,0,.40), 0 3px 14px rgba(0,0,0,.46);
   }
   :root[data-theme="sand"]{
@@ -77,7 +77,7 @@
     --ink:#1E2529; --muted:#5F6866; --faint:#98A19D; --hairline:#D2C9AE;
     --primary:#2F6F5E; --primary-ink:#22574A; --on-primary:#FFFFFF; --done:#2F6F5E;
     --partial:#A9791C; --defer:#868C97; --over:#C62828; --wash:#E9F1EE;
-    --hl:#1C5D99; --hl-wash:#E7F0FA;
+    --hl:#C0392B; --hl-wash:#FBE3E1;
     --shadow:0 1px 2px rgba(40,35,20,.08), 0 3px 12px rgba(40,35,20,.09);
   }
   :root[data-theme="rosegrey"]{
@@ -86,7 +86,7 @@
     --ink:#1E2529; --muted:#5F6866; --faint:#98A19D; --hairline:#CBB9B8;
     --primary:#2F6F5E; --primary-ink:#22574A; --on-primary:#FFFFFF; --done:#2F6F5E;
     --partial:#A9791C; --defer:#868C97; --over:#C62828; --wash:#E9F1EE;
-    --hl:#1C5D99; --hl-wash:#E7F0FA;
+    --hl:#C0392B; --hl-wash:#FBE3E1;
     --shadow:0 1px 2px rgba(40,25,24,.08), 0 3px 12px rgba(40,25,24,.09);
   }
   :root[data-theme="navy"]{
@@ -95,7 +95,7 @@
     --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#2E3A48;
     --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
     --partial:#D8A54A; --defer:#868C97; --over:#EF5350; --wash:#283530;
-    --hl:#6EB5F0; --hl-wash:#1B2A38;
+    --hl:#FF8A80; --hl-wash:#3A1F1E;
     --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
   }
   :root[data-theme="forest"]{
@@ -104,7 +104,7 @@
     --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#333C35;
     --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
     --partial:#D8A54A; --defer:#868C97; --over:#EF5350; --wash:#283530;
-    --hl:#6EB5F0; --hl-wash:#1B2A38;
+    --hl:#FF8A80; --hl-wash:#3A1F1E;
     --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
   }
   :root[data-theme="warmgrey"]{
@@ -113,7 +113,7 @@
     --ink:#E7EAE4; --muted:#9AA39E; --faint:#6C766F; --hairline:#3C3835;
     --primary:#5FB79E; --primary-ink:#8CD0BC; --on-primary:#0E1513; --done:#5FB79E;
     --partial:#D8A54A; --defer:#868C97; --over:#EF5350; --wash:#283530;
-    --hl:#6EB5F0; --hl-wash:#1B2A38;
+    --hl:#FF8A80; --hl-wash:#3A1F1E;
     --shadow:0 1px 2px rgba(0,0,0,.34), 0 3px 14px rgba(0,0,0,.38);
   }
 
@@ -952,8 +952,11 @@
      アプリ全体のメインカラーと同じ緑系を使っていたため、他の緑の要素に
      埋もれて見づらいという指摘。既存のどの意味付きカラー（--primary=
      メイン、--over=期限切れ等、--partial=期限間近、--defer=延期）とも
-     被らない新しい専用トークン --hl / --hl-wash（青系）を7テーマぶん
-     新設し、ここだけで使う。 */
+     被らない新しい専用トークン --hl / --hl-wash を7テーマぶん新設し、
+     ここだけで使う（当初は青系）。
+     v3.184: 「色の変更のセンスがない。赤系にして」との指摘で、
+     --hl / --hl-washの値を赤系に変更（トークン自体はv3.183で新設した
+     ものを使い続け、値だけ差し替え）。 */
   .tk-form label.fld > span.fld-label-hl{
     display:inline-block;width:fit-content;
     background:var(--hl-wash);color:var(--hl);
@@ -1066,7 +1069,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.183";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.184";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
