@@ -962,11 +962,19 @@
      7テーマぶん既に調整済み）を再利用する形に変更した。
      v3.187: 「色を塗るのではなく、重要度のように枠にして」との指摘。
      塗りつぶし＋白文字のバッジから、.ti-prio.high/.midと同じ構造
-     （中立な背景--surface-2＋枠線と文字だけを色付ける）に変更した。 */
+     （中立な背景--surface-2＋枠線と文字だけを色付ける）に変更した——
+     が、この変更で文字色も--partialに変えてしまい、v3.185で指示ずみの
+     「文字は白のまま」という条件を破ってしまっていた。
+     v3.188: 「文字は白って言ったよね。それ通りにやって」との指摘で修正。
+     塗り（background:var(--partial)）と白文字（v3.185〜）はそのまま残し、
+     そこに「枠」（v3.187の指示）を、塗りより少し濃い同系色の枠線として
+     追加する——塗りを無くして中立背景＋色文字にする（v3.187の実装）ので
+     はなく、塗り＋白文字の上に輪郭をはっきりさせる枠を足す、という
+     両立する形にした。 */
   .tk-form label.fld > span.fld-label-hl{
     display:inline-block;width:fit-content;
-    background:var(--surface-2);border:1px solid color-mix(in srgb,var(--partial) 40%,transparent);
-    color:var(--partial);
+    background:var(--partial);border:1px solid color-mix(in srgb,var(--partial) 65%,black);
+    color:#FFFFFF;
     padding:1px 8px;border-radius:6px;
   }
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -1076,7 +1084,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.187";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.188";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
