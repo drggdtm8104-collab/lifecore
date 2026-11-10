@@ -959,11 +959,15 @@
      いた。これが「系統が違う」という指摘の原因。「重要度の色みたいな
      オレンジに」との指示で、新色--hl/--hl-washは廃止し、重要度「中」と
      同じ既存トークン--partial（期限間近の警告にも使われるオレンジ/金系、
-     7テーマぶん既に調整済み）を再利用する形に変更した。 */
+     7テーマぶん既に調整済み）を再利用する形に変更した。
+     v3.187: 「色を塗るのではなく、重要度のように枠にして」との指摘。
+     塗りつぶし＋白文字のバッジから、.ti-prio.high/.midと同じ構造
+     （中立な背景--surface-2＋枠線と文字だけを色付ける）に変更した。 */
   .tk-form label.fld > span.fld-label-hl{
     display:inline-block;width:fit-content;
-    background:var(--partial);color:#FFFFFF;
-    padding:2px 9px;border-radius:6px;
+    background:var(--surface-2);border:1px solid color-mix(in srgb,var(--partial) 40%,transparent);
+    color:var(--partial);
+    padding:1px 8px;border-radius:6px;
   }
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .radio-row{display:flex;gap:7px;flex-wrap:wrap}
@@ -1072,7 +1076,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.186";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.187";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
