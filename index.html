@@ -970,10 +970,14 @@
      そこに「枠」（v3.187の指示）を、塗りより少し濃い同系色の枠線として
      追加する——塗りを無くして中立背景＋色文字にする（v3.187の実装）ので
      はなく、塗り＋白文字の上に輪郭をはっきりさせる枠を足す、という
-     両立する形にした。 */
+     両立する形にした——が、これも指示されていない「塗り」を勝手に
+     復活させてしまっていた。
+     v3.189: 「背景は無色」との明確な指示。文字＝白・枠線＝オレンジ
+     （--partial）の2つだけが指示内容で、背景（枠と文字の間）は塗らない。
+     指示されていない部分を勝手に埋めない。 */
   .tk-form label.fld > span.fld-label-hl{
     display:inline-block;width:fit-content;
-    background:var(--partial);border:1px solid color-mix(in srgb,var(--partial) 65%,black);
+    background:transparent;border:1px solid var(--partial);
     color:#FFFFFF;
     padding:1px 8px;border-radius:6px;
   }
@@ -1084,7 +1088,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.188";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.189";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
