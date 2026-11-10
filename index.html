@@ -993,8 +993,17 @@
      との指摘。タスク登録・編集シート（.tk-form）内の「選択する部分」
      （ボタンを選ぶ.radio-row。タイトル・備考のような記入欄1つだけの
      項目は対象外）を、ボタン1つ1つの枠とは別に、選択肢全体を1つの
-     グループとして薄い枠で囲み、項目同士の境目を分かりやすくする。 */
-  .tk-form .radio-row{border:1px solid var(--hairline);border-radius:9px;padding:6px}
+     グループとして薄い枠で囲み、項目同士の境目を分かりやすくする。
+     v3.191: 「期限など、下にも設定する行がある項目はそれらも含めて
+     まとめてくくって」との指摘。開始時期・期限は.radio-row（精度選択）
+     の下に日付/月入力＋クリアボタンの行（.fld-row）が続くが、v3.190では
+     .radio-row自体にしか枠が付かず、その下の行は枠の外に出てしまって
+     いた。.radio-rowへの直接指定をやめ、代わりに新設の.tk-choice-group
+     という外側のラッパーdivに枠を持たせる——単独の項目（タスクの型・
+     頻度・種類・重要度・重み・カテゴリ）は.radio-rowだけを囲み、開始
+     時期・期限は.radio-row＋後続の.fld-rowの両方を1つの.tk-choice-group
+     で一緒に囲む。 */
+  .tk-choice-group{border:1px solid var(--hairline);border-radius:9px;padding:6px}
   .stepper{display:inline-flex;align-items:center;gap:0;border:1px solid var(--hairline);border-radius:8px;overflow:hidden}
   .stepper button{width:34px;height:34px;display:grid;place-items:center;background:var(--surface)}
   .stepper span{width:40px;text-align:center;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
@@ -1095,7 +1104,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.190";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.191";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3974,12 +3983,15 @@ function sheetTask(taskId){
     <div class="tk-form">
     <label class="fld"><span class="fld-label-hl">タイトル</span><input type="text" id="tkName" value="${esc(t?.name||"")}" placeholder="例: 資格勉強"></label>
     <label class="fld"><span class="fld-label-hl">タスクの型</span></label>
+    <div class="tk-choice-group">
     <div class="radio-row" id="tkKind">
       <button data-v="single" class="${kind==="single"?"on":""}">完了型</button>
       <button data-v="repeat" class="${kind==="repeat"?"on":""}">継続型</button>
     </div>
+    </div>
     <div id="tkFreqWrap" style="${kind==="repeat"?"":"display:none"}">
       <label class="fld"><span>頻度</span></label>
+      <div class="tk-choice-group">
       <div class="radio-row" id="tkFreq">
         <button data-v="daily" class="${ftype==="daily"?"on":""}">毎日</button>
         <button data-v="perWeek" class="${ftype==="perWeek"?"on":""}">週</button>
@@ -3988,10 +4000,13 @@ function sheetTask(taskId){
         </span>
         <span style="align-self:center;color:var(--muted);font-size:13px;${ftype==="perWeek"?"":"display:none"}" id="tkNlbl">回 / 週</span>
       </div>
+      </div>
       <label class="fld"><span class="fld-label-hl">種類</span></label>
+      <div class="tk-choice-group">
       <div class="radio-row" id="tkRtype">
         <button data-v="skill" class="${(t?.rtype||"routine")==="skill"?"on":""}">スキル</button>
         <button data-v="routine" class="${(t?.rtype||"routine")==="routine"?"on":""}">ルーティン</button>
+      </div>
       </div>
       <label class="fld"><span>ポイント（任意・連携アプリ用。この継続タスク1回ぶんの負荷の目安）</span>
         <input type="number" id="tkPoints" class="short" inputmode="numeric" value="${t?.weight ?? 10}" min="0" placeholder="10">
@@ -3999,22 +4014,29 @@ function sheetTask(taskId){
     </div>
     <div id="tkPrioWrap" style="${kind==="single"?"":"display:none"}">
       <label class="fld"><span class="fld-label-hl">重要度</span></label>
+      <div class="tk-choice-group">
       <div class="radio-row" id="tkPrio">
         <button data-v="high" class="${(t?.prio||"low")==="high"?"on":""}">高</button>
         <button data-v="mid" class="${(t?.prio||"low")==="mid"?"on":""}">中</button>
         <button data-v="low" class="${(t?.prio||"low")==="low"?"on":""}">無</button>
       </div>
+      </div>
       <label class="fld"><span>重み（任意・連携アプリ用。このタスク1回ぶんの負荷の目安）</span></label>
+      <div class="tk-choice-group">
       <div class="radio-row" id="tkWeight">
         <button data-v="5" class="${(t?.weight ?? 5)===5?"on":""}">5</button>
         <button data-v="10" class="${(t?.weight ?? 5)===10?"on":""}">10</button>
         <button data-v="15" class="${(t?.weight ?? 5)===15?"on":""}">15</button>
       </div>
+      </div>
     </div>
     <label class="fld"><span>カテゴリ</span></label>
+    <div class="tk-choice-group">
     <div class="radio-row" id="tkCat">${CATS.map(c=>`<button data-v="${c}" class="${(t?.category||"その他")===c?"on":""}">${c}</button>`).join("")}</div>
+    </div>
     <div id="tkDueWrap" style="${kind==="single"?"":"display:none"}">
       <label class="fld"><span>開始時期（任意・並び順には影響しません）</span></label>
+      <div class="tk-choice-group">
       <div class="radio-row" id="tkStartPrec">${PRECS.map(p=>
         `<button data-v="${p}" class="${(t?.startPrec||"day")===p?"on":""}">${PREC_LABEL[p]}</button>`).join("")}</div>
       <div class="fld-row" style="margin-top:7px">
@@ -4022,13 +4044,16 @@ function sheetTask(taskId){
         <input type="month" id="tkStartMonth" class="short" value="${esc((t?.startPrec||"day")!=="day" ? monthOf(t?.startDate) : "")}" ${(t?.startPrec||"day")==="day"?"hidden":""}>
         <button type="button" class="mini-clear" data-act="tk-start-clear">クリア</button>
       </div>
+      </div>
       <label class="fld"><span>期限（任意）</span></label>
+      <div class="tk-choice-group">
       <div class="radio-row" id="tkDuePrec">${PRECS.map(p=>
         `<button data-v="${p}" class="${(t?.duePrec||"day")===p?"on":""}">${PREC_LABEL[p]}</button>`).join("")}</div>
       <div class="fld-row" style="margin-top:7px">
         <input type="date" id="tkDue" class="short" value="${esc((t?.duePrec||"day")==="day" ? (t?.due||"") : "")}" ${(t?.duePrec||"day")==="day"?"":"hidden"}>
         <input type="month" id="tkDueMonth" class="short" value="${esc((t?.duePrec||"day")!=="day" ? monthOf(t?.due) : "")}" ${(t?.duePrec||"day")==="day"?"hidden":""}>
         <button type="button" class="mini-clear" data-act="tk-due-clear">クリア</button>
+      </div>
       </div>
     </div>
     <label class="fld"><span>目安時間（分・任意）</span>
