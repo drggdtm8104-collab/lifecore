@@ -988,6 +988,13 @@
     background:var(--surface);font-size:12.5px;color:var(--muted);
   }
   .radio-row button.on{background:var(--wash);border-color:transparent;color:var(--primary-ink);font-weight:600}
+  /* v3.190: 「カテゴリがごちゃごちゃして見づらいのは項目の境目がないから
+     かと思った。項目名の下の選択する部分の周りを細い枠線で囲ってみて」
+     との指摘。タスク登録・編集シート（.tk-form）内の「選択する部分」
+     （ボタンを選ぶ.radio-row。タイトル・備考のような記入欄1つだけの
+     項目は対象外）を、ボタン1つ1つの枠とは別に、選択肢全体を1つの
+     グループとして薄い枠で囲み、項目同士の境目を分かりやすくする。 */
+  .tk-form .radio-row{border:1px solid var(--hairline);border-radius:9px;padding:6px}
   .stepper{display:inline-flex;align-items:center;gap:0;border:1px solid var(--hairline);border-radius:8px;overflow:hidden}
   .stepper button{width:34px;height:34px;display:grid;place-items:center;background:var(--surface)}
   .stepper span{width:40px;text-align:center;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
@@ -1088,7 +1095,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.189";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.190";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
