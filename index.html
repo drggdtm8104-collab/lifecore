@@ -1104,7 +1104,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.191";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.192";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -4003,9 +4003,11 @@ function sheetTask(taskId){
       </div>
       <label class="fld"><span class="fld-label-hl">種類</span></label>
       <div class="tk-choice-group">
+      <!-- v3.192: 「ルーティンの選択肢を左に」との指摘でボタン順を入れ替え
+           （以前はスキル→ルーティンの順）。既定値(既定"routine")は変更なし。 -->
       <div class="radio-row" id="tkRtype">
-        <button data-v="skill" class="${(t?.rtype||"routine")==="skill"?"on":""}">スキル</button>
         <button data-v="routine" class="${(t?.rtype||"routine")==="routine"?"on":""}">ルーティン</button>
+        <button data-v="skill" class="${(t?.rtype||"routine")==="skill"?"on":""}">スキル</button>
       </div>
       </div>
       <label class="fld"><span>ポイント（任意・連携アプリ用。この継続タスク1回ぶんの負荷の目安）</span>
