@@ -398,19 +398,25 @@
   /* 編集ボタン・状態バッジは常にこの1組としてまとめて右端に固定
      （タイトルが短くても長くても、ボタン同士の並び・位置は変わらない） */
   .card-head-actions{
-    margin-left:auto;flex:none;display:inline-flex;align-items:baseline;gap:6px;
+    margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:6px;
   }
   .card-status{
-    flex:none;display:inline-flex;align-items:baseline;gap:3px;
-    font-family:var(--font-mono);font-size:10.5px;color:var(--faint);letter-spacing:.02em;
+    flex:none;display:inline-flex;align-items:center;
+    font-family:var(--font-mono);color:var(--faint);
   }
   button.card-status{border:none;background:none;padding:0;cursor:pointer;-webkit-appearance:none;appearance:none}
+  /* v3.195: 編集・未達成ボタン（下のchipStyle、45×19px固定）と枠サイズを揃える
+     ——以前は padding だけで囲む可変サイズだったため、「完了」「完了する」など
+     文字数が違うラベルごとに枠の大きさが変わり、右端のボタン列の縦位置が
+     ばらついて見えていた。box-sizing:border-boxで45×19pxに固定し、
+     flexで中央寄せする（文字量はfont-sizeの方で収める——枠は変えない）。 */
   .card-state{
-    flex:none;
-    font-family:var(--font-mono);font-size:10.5px;letter-spacing:.02em;
-    padding:2px 6px;border-radius:6px;
+    flex:none;box-sizing:border-box;width:45px;height:19px;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-family:var(--font-mono);font-size:9.5px;
+    padding:0;border-radius:6px;
     background:var(--surface-2);color:var(--muted);
-    font-variant-numeric:tabular-nums;
+    overflow:hidden;white-space:nowrap;
   }
   .card-state.done{color:var(--done);background:var(--wash)}
   .card-state.deferred{color:var(--defer)}
@@ -1104,7 +1110,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.194";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.195";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2767,10 +2773,10 @@ function cardHTML(o, listView){
   const isSet = ["done","deferred","skipped"].includes(o.status);
 
   let stateBadge = "";
-  // タイムテーブル側（!listView）は完了バッジに所要時間を出さない — タイトルと
-  // 状態だけのシンプルな表示にしているため。ToDoリスト側（listView）は
-  // 実績が分かるよう引き続き所要時間を添える。
-  if(o.status==="done") stateBadge = `<span class="card-state done">完了${(listView && o.actualMin)?` ${o.actualMin}分`:""}</span>`;
+  // v3.195: 「完了」バッジの所要時間（分）表示は廃止——枠を固定サイズ
+  // （45×19px、下記chipStyleと同じ）に揃えるため、ラベルが状態によって
+  // 長さの変わる可変長の文字列にならないようにする。
+  if(o.status==="done") stateBadge = `<span class="card-state done">完了</span>`;
   else if(o.status==="deferred") stateBadge = `<span class="card-state deferred">延期</span>`;
   else if(o.status==="skipped") stateBadge = `<span class="card-state">未実施</span>`;
   else if(o.status==="planned") stateBadge = `<span class="card-state todo">完了する</span>`;
