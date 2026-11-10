@@ -69,6 +69,7 @@ const today = T.todayStr();
 // 一方、ToDoリストの見出し（未完了/完了でグループ分けする`renderStatusGroup`
 // のラベル）は状態を表す見出しであって押すボタンではないので、そのまま
 // 「未完了」のままにしている。
+// v3.194: 「済ます」から「完了する」に変更。
 
 T.db.tasks = [{ id:"t1", name:"テストタスク", kind:"single", freq:null, estMin:null, category:"その他", note:"", due:null, duePrec:"day", prio:"low", startDate:null, startPrec:"day", rtype:null, done:false, createdAt:today }];
 T.db.occurrences = [{ id:"o1", taskId:"t1", date:today, plannedStart:null, plannedMin:null, actualMin:null, status:"planned", doneAt:null, adhoc:false, title:null, note:"" }];
@@ -77,8 +78,9 @@ T.state.todayView = "list";
 T.renderToday();
 
 const html = elStore.main._html;
-ok("未完了の状態バッジのラベルは「済ます」になっている", /<span class="card-state todo">済ます<\/span>/.test(html));
+ok("未完了の状態バッジのラベルは「完了する」になっている", /<span class="card-state todo">完了する<\/span>/.test(html));
 ok("古いラベル「未完了」はこのバッジには使われていない", !/<span class="card-state todo">未完了<\/span>/.test(html));
+ok("旧ラベル「済ます」はこのバッジには使われていない", !/<span class="card-state todo">済ます<\/span>/.test(html));
 ok("ToDoリストの「未完了」見出し（グループ見出し、ボタンではない）はそのまま残っている", html.includes(">未完了<"));
 
 console.log(fail === 0 ? "\nALL PASS" : `\n${fail} FAILURES`);

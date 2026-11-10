@@ -1104,7 +1104,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.193";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.194";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2773,7 +2773,7 @@ function cardHTML(o, listView){
   if(o.status==="done") stateBadge = `<span class="card-state done">完了${(listView && o.actualMin)?` ${o.actualMin}分`:""}</span>`;
   else if(o.status==="deferred") stateBadge = `<span class="card-state deferred">延期</span>`;
   else if(o.status==="skipped") stateBadge = `<span class="card-state">未実施</span>`;
-  else if(o.status==="planned") stateBadge = `<span class="card-state todo">済ます</span>`;
+  else if(o.status==="planned") stateBadge = `<span class="card-state todo">完了する</span>`;
 
   // v3.66: 「完了」「一部実施」「取り消し」ボタンは廃止。ToDoリストでは
   // 状態バッジ自体が完了⇔未完了の切り替えボタンを兼ねる（タップで反転）。
@@ -2781,6 +2781,7 @@ function cardHTML(o, listView){
   // は状態の名詞で、押すと「終わらなかった」という意味で押しているのか
   // 紛らわしいとの指摘。「済ます」は動詞なので、押す＝完了させる行為だと
   // 分かりやすい（内部のstatus値"planned"自体は変更していない）。
+  // v3.194: 「済ます」から「完了する」に変更。
   // v3.84/v3.85: 編集ボタンは状態バッジの左隣に固定。`.card-head-actions`
   // （`margin-left:auto`）で編集ボタン＋状態バッジをひとまとめにして
   // カードヘッダーの右端に寄せているので、タイトルの長さに関係なく
