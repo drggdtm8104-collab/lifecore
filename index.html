@@ -1110,7 +1110,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.196";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.197";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -3512,7 +3512,14 @@ function renderSettings(){
      <button class="btn" style="margin-top:8px;color:var(--over);border-color:var(--over)" data-act="reset-all">すべて初期化（テンプレートも）</button>`);
 
   const saved = db.meta && db.meta.savedAt ? new Date(db.meta.savedAt).toLocaleString() : "—";
-  html += `<p class="summary" style="margin:18px 2px 0">LifeCore v${esc(APP_VERSION)} ・ この端末の最終保存: ${esc(saved)}</p>`;
+  // v3.197: 「毎回立ち上げ直してるんだけど、リロードできるボタンは作れない？」
+  // との指示。自前ホスト（sw.js）はnavigate（画面の読み込み）を常にネット優先
+  // （cache:"no-store"）で取りに行く作りなので、アプリを閉じて開き直す代わりに
+  // location.reload()するだけで最新のindex.htmlが取れる——その手間を省くボタン。
+  html += `<p class="summary" style="margin:18px 2px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span>LifeCore v${esc(APP_VERSION)} ・ この端末の最終保存: ${esc(saved)}</span>
+    <button type="button" class="btn ghost tiny" style="flex:none" data-act="reload-app">再読み込み</button>
+  </p>`;
   M.innerHTML = html;
 }
 
@@ -4848,6 +4855,13 @@ document.addEventListener("click", e=>{
       navigator.clipboard?.writeText(txt).then(()=>toast("コピーしました"),()=>toast("手動で選択してコピーしてください"));
       break;
     }
+    // v3.197: 「設定」の「再読み込み」ボタン——ホーム画面に追加したアプリでは
+    // アイコンをタップしても既存の画面がそのまま前面に出るだけで、デプロイ
+    // した最新版を見るには毎回完全に閉じて開き直す必要があった。
+    // sw.jsのfetchハンドラはnavigate（画面の読み込み）を常にcache:"no-store"
+    // でネットから取りに行く作りなので、location.reload()するだけで
+    // 最新のindex.htmlが反映される——閉じて開き直す手間を省く。
+    case "reload-app": location.reload(); break;
     // v3.107: 同期を前提にせず「必要なときに手動でPC⇔スマホの内容を
     // 反映する」運用にするため、読み込みを「マージ」と「完全に置き換え」の
     // 2択にした。以前は常にまるごと置き換えで、両端末で編集してから
