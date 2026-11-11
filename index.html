@@ -1110,7 +1110,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.195";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.196";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2981,9 +2981,12 @@ function renderTasks(){
         ${inTodayList?`<span class="task-today-flag"></span>`:""}
         <div style="flex:1;min-width:0">
           <div class="ti-name">${esc(t.name)}</div>
-          <div class="ti-meta-row">
+          <div class="ti-meta-row" style="justify-content:space-between">
             <div class="ti-meta">${rtypeChip(t)}${badge}<span class="ti-cat">${esc(t.category||"—")}</span></div>
-            ${hasNote?`<button class="note-toggle" data-act="toggle-note" data-id="${t.id}">メモ ${noteOpen?"▲":"▼"}</button>`:""}
+            <div style="display:flex;align-items:center;gap:6px;flex:none">
+              ${hasNote?`<button class="note-toggle" data-act="toggle-note" data-id="${t.id}">メモ ${noteOpen?"▲":"▼"}</button>`:""}
+              <button type="button" class="btn ghost tiny" style="flex:none;border:1px solid var(--hairline);line-height:1.5;padding:1px 6px;font-size:10px;border-radius:6px" data-act="quick-run" data-id="${t.id}">直接実行</button>
+            </div>
           </div>
           ${noteOpen && note?`<div class="card-note">${esc(note)}</div>`:""}
           ${noteOpen && progressNote?`<div class="card-onote">${progressIsToday?"":`<span class="po-date">${esc(fmtDateShort(latestOcc.date))}時点：</span>`}${esc(progressNote)}</div>`:""}
@@ -3969,6 +3972,26 @@ function sheetOccEdit(id){
     </div>`);
 }
 
+// v3.196: 「継続型タスクを一日に何度も実行したり予定外に実施することもある」
+// との指示で追加。「ToDoリストに追加」してから状態バッジで完了にする、という
+// 2段階を踏まずに、継続型タスク一覧（タスクタブ）の「直接実行」ボタンから
+// この場で完了ずみのoccurrenceを1件作る。時刻・進捗メモは任意（空欄のまま
+// 「完了する」を押してもよい）。開始・終了はsheetOccEditと同じtimeRow
+// （＋／－の方向トグル＋1/5/30分ボタン）を再利用する。
+function sheetQuickRun(taskId){
+  const t = db.tasks.find(x=>x.id===taskId); if(!t) return;
+  openSheet(`<h2>${esc(t.name)} を実行</h2>
+    <p class="sheet-sub">予定外にやった分を、その場で完了として記録します。開始・終了・進捗メモはすべて任意です。</p>
+    <label class="fld"><span>開始 〜 終了（空欄可）</span></label>
+    ${timeRow("開始", "qrStart", "")}
+    ${timeRow("終了", "qrEnd", "", '<button type="button" class="mini-clear" data-act="qr-clear-span">クリア</button>')}
+    <label class="fld"><span>進捗メモ（任意）</span>${noteTextarea("qrNote", "", "例: 1セットだけ／途中まで など")}</label>
+    <div class="sheet-actions">
+      <button class="btn ghost" data-act="close-sheet">キャンセル</button>
+      <button class="btn primary" data-act="quick-run-confirm" data-id="${t.id}">完了する</button>
+    </div>`);
+}
+
 /* -- new / edit task -- */
 function sheetTask(taskId){
   const t = taskId ? db.tasks.find(x=>x.id===taskId) : null;
@@ -4485,6 +4508,38 @@ document.addEventListener("click", e=>{
       break;
     }
 
+    case "quick-run": sheetQuickRun(id); break;
+    case "qr-clear-span": {
+      const s = document.getElementById("qrStart"), e = document.getElementById("qrEnd");
+      if(s) s.value = ""; if(e) e.value = "";
+      toast("時間をクリアしました（完了するで確定）");
+      break;
+    }
+    // v3.196: 「完了する」— その場で完了ずみのoccurrenceを1件作る。
+    // toggle-occ-doneの完了側と同じ考え方で、所要時間が空欄ならplannedMin→
+    // estMinの順で補う。adhoc:trueにして「予定外」のメタ表示（既存の
+    // cardHTML側の表示、これまで使われていなかった）が付くようにする。
+    case "quick-run-confirm": {
+      const t = db.tasks.find(x=>x.id===id); if(!t) break;
+      const st = document.getElementById("qrStart").value || null;
+      let pm = null;
+      if(st){
+        const end = (document.getElementById("qrEnd").value||"").trim();
+        let m = end ? durFromEnd(st, end) : null;
+        if(m === 0) m = null;
+        pm = m;
+      }
+      const note = (document.getElementById("qrNote").value||"").trim();
+      const d = todayStr();
+      const o = { id:uid(), taskId:t.id, date:d, plannedStart:st, plannedMin:pm,
+        actualMin: pm || t.estMin || 0, status:"done", doneAt: stamp(d),
+        adhoc:true, title:null, note };
+      db.occurrences.push(o);
+      save(); closeSheet(); render();
+      sendTaskEvent(o, "task.completed");
+      toast("実行を記録しました");
+      break;
+    }
 
     case "new-task": sheetTask(null); break;
     case "edit-task": sheetTask(id); break;
