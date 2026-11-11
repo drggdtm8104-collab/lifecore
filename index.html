@@ -2982,11 +2982,11 @@ function renderTasks(){
         <div style="flex:1;min-width:0">
           <div class="ti-name">${esc(t.name)}</div>
           <div class="ti-meta-row" style="justify-content:space-between">
-            <div class="ti-meta">${rtypeChip(t)}${badge}<span class="ti-cat">${esc(t.category||"—")}</span></div>
-            <div style="display:flex;align-items:center;gap:6px;flex:none">
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="ti-meta">${rtypeChip(t)}${badge}<span class="ti-cat">${esc(t.category||"—")}</span></div>
               ${hasNote?`<button class="note-toggle" data-act="toggle-note" data-id="${t.id}">メモ ${noteOpen?"▲":"▼"}</button>`:""}
-              <button type="button" class="btn ghost tiny" style="flex:none;border:1px solid var(--hairline);line-height:1.5;padding:1px 6px;font-size:10px;border-radius:6px" data-act="quick-run" data-id="${t.id}">直接実行</button>
             </div>
+            <button type="button" class="btn ghost tiny" style="flex:none;border:1px solid var(--hairline);line-height:1.5;padding:1px 6px;font-size:10px;border-radius:6px" data-act="quick-run" data-id="${t.id}">直接実行</button>
           </div>
           ${noteOpen && note?`<div class="card-note">${esc(note)}</div>`:""}
           ${noteOpen && progressNote?`<div class="card-onote">${progressIsToday?"":`<span class="po-date">${esc(fmtDateShort(latestOcc.date))}時点：</span>`}${esc(progressNote)}</div>`:""}

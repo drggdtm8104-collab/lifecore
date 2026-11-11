@@ -112,6 +112,27 @@ T.renderTasks();
   ok("「直接実行」ボタンに種類(.ti-rtype)と同じ枠・高さが付いている",
     /style="flex:none;border:1px solid var\(--hairline\);line-height:1\.5;padding:1px 6px;font-size:10px;border-radius:6px"\s*data-act="quick-run"/.test(html));
 }
+
+// --- 1b. 「メモの位置がおかしくなっている。もとは左寄りだった」との指摘で修正。
+//          「メモ ▾/▲」は種類/頻度と同じ左側のグループのままで、「直接実行」
+//          だけが右側（justify-content:space-betweenのもう一方）に来る。 ---
+T.db.tasks.push({ id:"t3", name:"メモ付きタスク", kind:"repeat", freq:{type:"daily"}, estMin:5, category:"健康", note:"固定メモ", due:null, duePrec:"day", prio:"low", startDate:null, startPrec:"day", rtype:"routine", done:false, createdAt:today });
+T.renderTasks();
+{
+  const html = sandbox.document.getElementById("main").innerHTML;
+  // t3（メモ付きタスク）の行だけを切り出して順序を見る（t1はメモが無いので
+  // 「メモ」トグル自体が存在せず、同じhtml全体をそのまま見るとt1側の
+  // 「直接実行」が先に出てきてしまい、t3の行の中の並びを正しく見られない）。
+  const rowStart = html.indexOf("メモ付きタスク");
+  const row = html.slice(rowStart);
+  const idxWrapGroup = row.indexOf('style="display:flex;align-items:center;gap:6px"');
+  const idxTiMeta = row.indexOf('class="ti-meta"');
+  const idxNoteToggle = row.indexOf('class="note-toggle"');
+  const idxQuickRun = row.indexOf('data-act="quick-run"');
+  ok("「メモ」トグルは種類/頻度と同じ左側のグループに入っている（種類→メモ→直接実行の順）",
+    rowStart !== -1 && idxWrapGroup !== -1 && idxWrapGroup < idxTiMeta && idxTiMeta < idxNoteToggle && idxNoteToggle < idxQuickRun);
+}
+
 T.state.tasksView = "single";
 T.renderTasks();
 {
