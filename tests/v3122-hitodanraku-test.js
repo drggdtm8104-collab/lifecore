@@ -172,16 +172,15 @@ ok("a freeBlock plan is excluded while a real occupied block still splits the ra
 // ============================================================
 // skillBacklog()
 // ============================================================
+// v3.201: 頻度の仕様変更（毎日/週n回 → 毎日/不定期）でperWeek（週の目標回数）が
+// 無くなった。不定期にも数値目標は無いため、skillBacklogはdailyと同じ
+// 「直近7日の実施日数」基準に統一されている——両方で同じ結果になることを確認。
 T.db.occurrences = [];
-const perWeekTask = { id:"pw1", kind:"repeat", rtype:"skill", freq:{type:"perWeek", n:3}, estMin:20 };
-ok("perWeek task with zero completions this week has full backlog", T.skillBacklog(perWeekTask, TODAY) === 3);
+const irregularTask = { id:"ir1", kind:"repeat", rtype:"skill", freq:{type:"irregular"}, estMin:20 };
+ok("irregular task with no completions in the last 7 days has backlog 7", T.skillBacklog(irregularTask, TODAY) === 7);
 
-T.db.occurrences = [
-  { id:"o1", taskId:"pw1", date:TODAY, status:"done" },
-  { id:"o2", taskId:"pw1", date:TODAY, status:"done" },
-  { id:"o3", taskId:"pw1", date:TODAY, status:"done" },
-];
-ok("perWeek task that already met its weekly target has zero backlog", T.skillBacklog(perWeekTask, TODAY) === 0);
+T.db.occurrences = [1,2,3,4,5,6,7].map(i => ({ id:"ir"+i, taskId:"ir1", date: T.addDays(TODAY, -i), status:"done" }));
+ok("irregular task done every day for the last 7 days has backlog 0", T.skillBacklog(irregularTask, TODAY) === 0);
 
 const dailyTask = { id:"d1", kind:"repeat", rtype:"skill", freq:{type:"daily"}, estMin:15 };
 T.db.occurrences = [];

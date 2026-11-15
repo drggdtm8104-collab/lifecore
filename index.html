@@ -637,16 +637,25 @@
     margin-top:3px;font-size:11px;color:var(--faint);line-height:1.4;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
   }
+  /* v3.201: 「毎日」「不定期」で文字数が違う分だけ幅が変わり、継続型タスク間で
+     揃っていなかった。実測（ヘッドレスブラウザ）で「不定期」が最長（45.5px）
+     だったので、それに数pxの余裕を乗せた50pxに幅を固定——全タスクで同じ幅になる。 */
   .ti-freq{
-    flex:none;font-family:var(--font-mono);font-size:10.5px;
+    flex:none;width:50px;text-align:center;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-family:var(--font-mono);font-size:10.5px;
     color:var(--primary-ink);background:var(--wash);
     padding:2px 7px;border-radius:6px;
   }
-  .ti-freq.met{color:var(--faint);background:var(--surface-2)}
   /* 種類（スキル／ルーティン）は分類のためだけの表示なので、選んだ内容によって
-     色を変えたりしない — どちらも同じ地味な見た目（カテゴリと同系統）にする */
+     色を変えたりしない — どちらも同じ地味な見た目（カテゴリと同系統）にする。
+     v3.201: 「ルーティン」「スキル」も文字数が違う分だけ幅が揃っていなかった
+     ——実測で「ルーティン」が最長（63.7px）だったので、数pxの余裕を乗せた
+     68pxに幅を固定した（.ti-freqと同じ考え方）。 */
   .ti-rtype{
-    flex:none;font-family:var(--font-body);font-size:10px;
+    flex:none;width:68px;text-align:center;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-family:var(--font-body);font-size:10px;
     padding:1px 6px;border-radius:6px;
     background:var(--surface-2);border:1px solid var(--hairline);color:var(--muted);
   }
@@ -1014,9 +1023,6 @@
      時期・期限は.radio-row＋後続の.fld-rowの両方を1つの.tk-choice-group
      で一緒に囲む。 */
   .tk-choice-group{border:1px solid var(--hairline);border-radius:9px;padding:6px}
-  .stepper{display:inline-flex;align-items:center;gap:0;border:1px solid var(--hairline);border-radius:8px;overflow:hidden}
-  .stepper button{width:34px;height:34px;display:grid;place-items:center;background:var(--surface)}
-  .stepper span{width:40px;text-align:center;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 
   /* ---------- sheet ---------- */
   .sheet-wrap{
@@ -1114,7 +1120,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.200";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.201";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1385,6 +1391,11 @@ function migrate(d){
     // v3.181: MyQuest連携用の「負荷の重み」。旧データ（この項目を持たない）
     // には既定値を補う——完了型は3択の既定「5」、継続型は自由入力の既定「10」。
     if(t.weight == null) t.weight = t.kind==="repeat" ? 10 : 5;
+    // v3.201: 頻度の仕様変更（毎日/週n回 → 毎日/不定期）。旧データの
+    // freq.type==="perWeek"（週の実施回数で目標管理）は、回数目標という概念
+    // 自体が無くなったため「不定期」に読み替える——perWeekで持っていた
+    // n（週の目標回数）は捨てる。
+    if(t.kind==="repeat" && t.freq?.type==="perWeek") t.freq = { type:"irregular" };
   });
   // v3.102: v3.100で進捗メモの参照先を「今日の実施」から「一番新しい実施」に
   // 変えたが、それより前（またはv3.101のcarry-forward修正が効く前）に空の
@@ -1845,8 +1856,8 @@ function seed(){
     { id:T.study, name:"資格勉強", kind:"repeat", freq:{type:"daily"}, estMin:30, category:"勉強", done:false, createdAt:t, prio:"low", startDate:null, rtype:"skill" },
     { id:T.mail,  name:"メール処理", kind:"repeat", freq:{type:"daily"}, estMin:15, category:"仕事", done:false, createdAt:t, prio:"low", startDate:null, rtype:"routine" },
     { id:T.read,  name:"読書", kind:"repeat", freq:{type:"daily"}, estMin:15, category:"趣味", done:false, createdAt:t, prio:"low", startDate:null, rtype:"routine" },
-    { id:T.gym,   name:"筋トレ", kind:"repeat", freq:{type:"perWeek",n:3}, estMin:20, category:"運動", done:false, createdAt:t, prio:"low", startDate:null, rtype:"skill" },
-    { id:T.inst,  name:"楽器の練習", kind:"repeat", freq:{type:"perWeek",n:4}, estMin:20, category:"趣味", done:false, createdAt:t, prio:"low", startDate:null, rtype:"skill" },
+    { id:T.gym,   name:"筋トレ", kind:"repeat", freq:{type:"irregular"}, estMin:20, category:"運動", done:false, createdAt:t, prio:"low", startDate:null, rtype:"skill" },
+    { id:T.inst,  name:"楽器の練習", kind:"repeat", freq:{type:"irregular"}, estMin:20, category:"趣味", done:false, createdAt:t, prio:"low", startDate:null, rtype:"skill" },
     Object.assign({ id:T.bfast, name:"朝食", estMin:20, category:"食事" }, R),
     Object.assign({ id:T.lunch, name:"昼食", estMin:30, category:"食事" }, R),
     Object.assign({ id:T.dinner, name:"夕食", estMin:30, category:"食事" }, R),
@@ -2059,6 +2070,13 @@ const byRemarkShow = (a,b) => {
    完了型タスクには出さない。未設定は「ルーティン」扱い。 */
 const RTYPE = { skill:"スキル", routine:"ルーティン" };
 const rtypeChip = t => { const r = t.rtype || "routine"; return `<span class="ti-rtype ${r}">${RTYPE[r]}</span>`; };
+/* v3.201: 継続型タスクの「頻度」。以前は 毎日 / 週n回（週の実施回数で目標を
+   管理）だったが、「毎日と不定期の選択肢にして、現状見て判断するために使う」
+   との指示で、週n回の目標管理をやめ 毎日 / 不定期 の2択にした——不定期は
+   回数目標を持たず、一覧の進捗メモなどを見て本人がその場で判断する前提の、
+   単なる分類表示。日付に依存しないので、rtypeChipと同じ単純な関数になる。 */
+const FREQ = { daily:"毎日", irregular:"不定期" };
+const freqChip = t => { const f = (t.freq?.type==="irregular") ? "irregular" : "daily"; return `<span class="ti-freq ${f}">${FREQ[f]}</span>`; };
 /* a bordered "label ─ value" chip; value is "—" when unset */
 const fieldChip = (label, val, cls="") =>
   `<span class="ti-field ${cls}"><span class="tf-l">${label}</span><span class="tf-v">${esc(val || "—")}</span></span>`;
@@ -2123,20 +2141,15 @@ const byQuadrant = (a,b) => {
                              : (prioRank(a)-prioRank(b) || byDue(a,b));
 };
 
-function weekCount(taskId, ref){
-  const ws = weekStart(ref), we = addDays(ws,6);
-  return db.occurrences.filter(o=>o.taskId===taskId && o.status==="done" && inRange(o.date,ws,we)).length;
-}
 function hasOccToday(taskId, d){ return db.occurrences.some(o=>o.taskId===taskId && o.date===d); }
 /* v3.122: 「ひと段落」機能用。継続型タスクが頻度目標に対してどれだけ
    後回しになっているかを0〜7のレンジで返す（大きいほど優先）。傾向タブの
    analyze()にはこれに使える既存ロジックが無い（chronicは完了型寄り、
-   repeatDayは曜日パターンで緊急度ではない）ため新規に最小限で作る。 */
+   repeatDayは曜日パターンで緊急度ではない）ため新規に最小限で作る。
+   v3.201: 頻度の仕様変更（毎日/週n回 → 毎日/不定期）で週n回の目標が
+   無くなったため、perWeek専用の分岐（weekCount基準）は削除——不定期にも
+   数値目標は無いので、毎日と同じ「直近7日の実施日数」基準に統一した。 */
 function skillBacklog(t, date){
-  if(t.freq?.type === "perWeek"){
-    const n = t.freq.n || 1;
-    return Math.max(0, n - weekCount(t.id, date));
-  }
   let doneDays = 0;
   for(let i=1; i<=7; i++){
     const d = addDays(date, -i);
@@ -2982,13 +2995,7 @@ function renderTasks(){
     // を置けないため、完了型と同じく行全体を<div data-act="edit-task">に
     // する必要がある。
     const repeatRow = t => {
-      let badge = "";
-      if(t.freq?.type==="perWeek"){
-        const c = weekCount(t.id,d);
-        badge = `<span class="ti-freq ${c>=t.freq.n?"met":""}">今週 ${c}/${t.freq.n}</span>`;
-      } else {
-        badge = `<span class="ti-freq">毎日</span>`;
-      }
+      const badge = freqChip(t);
       const inTodayList = hasOccToday(t.id, T);
       const latestOcc = latestOccOf(t.id);
       const note = t.note || "";
@@ -3621,9 +3628,7 @@ function sheetTplTaskPick(){
   const candRow = t => {
     const metaChips = t.kind==="single"
       ? `${prioChip(t)}${fieldChip("開始", mdShort(t.startDate, t.startPrec))}${fieldChip("期限", mdShort(t.due, t.duePrec), dueClass(t.due))}<span class="ti-cat">${esc(t.category||"—")}</span>`
-      : `${rtypeChip(t)}${t.freq?.type==="perWeek"
-          ? `<span class="ti-freq ${weekCount(t.id,d)>=t.freq.n?"met":""}">今週 ${weekCount(t.id,d)}/${t.freq.n}</span>`
-          : `<span class="ti-freq">毎日</span>`}<span class="ti-cat">${esc(t.category||"—")}</span>`;
+      : `${rtypeChip(t)}${freqChip(t)}<span class="ti-cat">${esc(t.category||"—")}</span>`;
     const n = placedCount[t.id] || 0;
     return `<button class="cand" data-act="tpl-task-pick" data-id="${t.id}">
       <div style="flex:1;min-width:0"><div class="cd-name">${esc(t.name)}</div>
@@ -3756,9 +3761,7 @@ function sheetTodayPick(){
   const candRow = t => {
     const metaChips = t.kind==="single"
       ? `${prioChip(t)}${fieldChip("開始", mdShort(t.startDate, t.startPrec))}${fieldChip("期限", mdShort(t.due, t.duePrec), dueClass(t.due))}<span class="ti-cat">${esc(t.category||"—")}</span>`
-      : `${rtypeChip(t)}${t.freq?.type==="perWeek"
-          ? `<span class="ti-freq ${weekCount(t.id,d)>=t.freq.n?"met":""}">今週 ${weekCount(t.id,d)}/${t.freq.n}</span>`
-          : `<span class="ti-freq">毎日</span>`}<span class="ti-cat">${esc(t.category||"—")}</span>`;
+      : `${rtypeChip(t)}${freqChip(t)}<span class="ti-cat">${esc(t.category||"—")}</span>`;
     return `<button class="cand" data-act="pick-add" data-id="${t.id}">
       <div style="flex:1;min-width:0"><div class="cd-name">${esc(t.name)}</div>
       <div class="cd-meta">${metaChips}</div>
@@ -4026,8 +4029,7 @@ function sheetQuickRun(taskId){
 function sheetTask(taskId){
   const t = taskId ? db.tasks.find(x=>x.id===taskId) : null;
   const kind = t?.kind || "single";
-  const ftype = t?.freq?.type || "daily";
-  const fn = t?.freq?.n || 3;
+  const ftype = (t?.freq?.type === "irregular") ? "irregular" : "daily";
   // v3.66: 完了型タスクに実施があれば、その進捗メモをここからも編集できる
   // ようにする — ToDoリストのカードの編集画面と同じ occurrence.note を指す
   // ので、どちらで書いても連動する。実施が1つも無いタスクには、この欄
@@ -4058,11 +4060,7 @@ function sheetTask(taskId){
       <div class="tk-choice-group">
       <div class="radio-row" id="tkFreq">
         <button data-v="daily" class="${ftype==="daily"?"on":""}">毎日</button>
-        <button data-v="perWeek" class="${ftype==="perWeek"?"on":""}">週</button>
-        <span class="stepper" id="tkN" style="${ftype==="perWeek"?"":"display:none"}">
-          <button data-act="n-dec">−</button><span id="tkNv">${fn}</span><button data-act="n-inc">＋</button>
-        </span>
-        <span style="align-self:center;color:var(--muted);font-size:13px;${ftype==="perWeek"?"":"display:none"}" id="tkNlbl">回 / 週</span>
+        <button data-v="irregular" class="${ftype==="irregular"?"on":""}">不定期</button>
       </div>
       </div>
       <label class="fld"><span class="fld-label-hl">種類</span></label>
@@ -4165,7 +4163,7 @@ function saveTaskFromForm(id){
   const rtype = kind==="repeat" ? (document.querySelector("#tkRtype button.on")?.dataset.v || "routine") : null;
   if(kind==="repeat"){
     const ft = document.querySelector("#tkFreq button.on")?.dataset.v || "daily";
-    freq = ft==="perWeek" ? { type:"perWeek", n: parseInt(document.getElementById("tkNv").textContent,10)||3 } : { type:"daily" };
+    freq = ft==="irregular" ? { type:"irregular" } : { type:"daily" };
   }
   // v3.181: MyQuest連携用の「負荷の重み」。完了型は3択（5/10/15、既定5）、
   // 継続型は自由入力の整数（既定10、上下限なし）——どちらも最終的には
@@ -4683,8 +4681,6 @@ document.addEventListener("click", e=>{
       break;
     }
     case "tk-min-clear": { const e=document.getElementById("tkMin"); if(e) e.value=""; break; }
-    case "n-dec": { const s=document.getElementById("tkNv"); s.textContent=Math.max(1,(+s.textContent)-1); break; }
-    case "n-inc": { const s=document.getElementById("tkNv"); s.textContent=Math.min(7,(+s.textContent)+1); break; }
 
     case "hist-view": { state.histView = v; render(); M.scrollTop = 0; break; }
     case "span": {
@@ -4955,11 +4951,6 @@ document.addEventListener("click", e=>{
     if(dw) dw.style.display = isRepeat ? "none" : "";
     const pw = document.getElementById("tkPrioWrap");
     if(pw) pw.style.display = isRepeat ? "none" : "";
-  }
-  if(row.id==="tkFreq"){
-    const per = b.dataset.v==="perWeek";
-    document.getElementById("tkN").style.display = per ? "" : "none";
-    document.getElementById("tkNlbl").style.display = per ? "" : "none";
   }
   // 期限／開始時期の粒度: 「日付」なら type=date、それ以外なら type=month に切り替える
   if(row.id==="tkStartPrec"){
