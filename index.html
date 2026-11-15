@@ -1110,7 +1110,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.197";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.198";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2909,14 +2909,17 @@ function renderTasks(){
         ${inTodayList?`<span class="task-today-flag"></span>`:""}
         <div style="flex:1;min-width:0">
           <div class="ti-name">${esc(t.name)}</div>
-          <div class="ti-meta-row">
-            <div class="ti-meta grid4">
-              <span class="tf-prio">${prioChip(t)}</span>
-              ${fieldChip("開始", mdShort(t.startDate, t.startPrec))}
-              ${fieldChip("期限", mdShort(t.due, t.duePrec), dueClass(t.due))}
-              <span class="ti-cat">${esc(t.category||"—")}</span>
+          <div class="ti-meta-row" style="justify-content:space-between;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:6px;min-width:0">
+              <div class="ti-meta grid4">
+                <span class="tf-prio">${prioChip(t)}</span>
+                ${fieldChip("開始", mdShort(t.startDate, t.startPrec))}
+                ${fieldChip("期限", mdShort(t.due, t.duePrec), dueClass(t.due))}
+                <span class="ti-cat">${esc(t.category||"—")}</span>
+              </div>
+              ${hasNote?`<button class="note-toggle" data-act="toggle-note" data-id="${t.id}">メモ ${noteOpen?"▲":"▼"}</button>`:""}
             </div>
-            ${hasNote?`<button class="note-toggle" data-act="toggle-note" data-id="${t.id}">メモ ${noteOpen?"▲":"▼"}</button>`:""}
+            <button type="button" class="btn ghost tiny" style="flex:none;border:1px solid var(--hairline);line-height:1.5;padding:1px 6px;font-size:10px;border-radius:6px" data-act="quick-run" data-id="${t.id}">直接実行</button>
           </div>
           ${noteOpen && note?`<div class="card-note">${esc(note)}</div>`:""}
           ${noteOpen && progressNote?`<div class="card-onote">${progressIsToday?"":`<span class="po-date">${esc(fmtDateShort(latestOcc.date))}時点：</span>`}${esc(progressNote)}</div>`:""}
@@ -3985,6 +3988,10 @@ function sheetOccEdit(id){
 // この場で完了ずみのoccurrenceを1件作る。時刻・進捗メモは任意（空欄のまま
 // 「完了する」を押してもよい）。開始・終了はsheetOccEditと同じtimeRow
 // （＋／－の方向トグル＋1/5/30分ボタン）を再利用する。
+// v3.198: 「完了型タスクにも同じように」との指示で、完了型タスク一覧の行にも
+// 同じ「直接実行」ボタンを追加。taskIdだけで動くこの関数自体は元から
+// kindを問わないので変更不要——呼び出し側（タスクタブのsingleRow）と
+// quick-run-confirm側（t.doneの更新）だけ完了型に対応させた。
 function sheetQuickRun(taskId){
   const t = db.tasks.find(x=>x.id===taskId); if(!t) return;
   openSheet(`<h2>${esc(t.name)} を実行</h2>
@@ -4542,6 +4549,11 @@ document.addEventListener("click", e=>{
         actualMin: pm || t.estMin || 0, status:"done", doneAt: stamp(d),
         adhoc:true, title:null, note };
       db.occurrences.push(o);
+      // v3.198: 完了型タスクでは、他の完了経路（toggle-occ-doneの完了側）と
+      // 同じく t.done=true にする——これが無いとタスクタブの完了型一覧
+      // （singlesOpen = !t.done）からこのタスクが消えず、既に完了したのに
+      // 一覧に残り続けてしまう。
+      if(t.kind==="single") t.done = true;
       save(); closeSheet(); render();
       sendTaskEvent(o, "task.completed");
       toast("実行を記録しました");

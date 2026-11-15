@@ -79,6 +79,9 @@ function dispatchClick(dataAct, extra){
 // との指示で追加した「実行」ボタン。ToDoリストに追加→状態バッジで完了、の
 // 2段階を踏まずに、タスクタブの継続型一覧から直接、完了ずみのoccurrenceを
 // その場で1件作る。時刻・進捗メモは任意。
+// v3.198: 「完了型タスクにも同じように」との指示で、完了型タスク一覧にも
+// 同じボタンを追加。完了型は完了するとt.done=trueで一覧から消える点が
+// 継続型と違うため、その挙動も確認する。
 
 T.db.tasks = [
   { id:"t1", name:"水を飲む", kind:"repeat", freq:{type:"daily"}, estMin:5, category:"健康", note:"", due:null, duePrec:"day", prio:"low", startDate:null, startPrec:"day", rtype:"routine", done:false, createdAt:today },
@@ -133,11 +136,25 @@ T.renderTasks();
     rowStart !== -1 && idxWrapGroup !== -1 && idxWrapGroup < idxTiMeta && idxTiMeta < idxNoteToggle && idxNoteToggle < idxQuickRun);
 }
 
+// --- 1c. v3.198: 「完了型タスクにも同じように、直接実行ボタンを実装して」
+//          との指示で、完了型タスク一覧の行にも同じボタンを追加した。
+//          grid4（重要度/開始/期限/カテゴリの固定幅グリッド）が継続型より
+//          横に広いため、ti-meta-rowにflex-wrap:wrapを足して、幅が足りない
+//          画面では「直接実行」だけ折り返せるようにしている。 ---
 T.state.tasksView = "single";
 T.renderTasks();
 {
   const html = sandbox.document.getElementById("main").innerHTML;
-  ok("完了型タスク一覧には「直接実行」ボタンは出ない", !html.includes('data-act="quick-run"'));
+  ok("完了型タスク一覧にも「直接実行」ボタンが出る",
+    html.includes('data-act="quick-run" data-id="t2">直接実行</button>'));
+  const idxMetaRow = html.indexOf('class="ti-meta-row"');
+  const idxQuickRun = html.indexOf('data-act="quick-run"');
+  ok("完了型でも「直接実行」はti-meta-rowの中、右側にある",
+    idxMetaRow !== -1 && idxQuickRun > idxMetaRow);
+  ok("完了型のti-meta-rowも両端揃え＋折り返し可にしている",
+    /class="ti-meta-row" style="justify-content:space-between;flex-wrap:wrap"/.test(html));
+  ok("完了型の「直接実行」ボタンも継続型と同じ枠・高さ",
+    /style="flex:none;border:1px solid var\(--hairline\);line-height:1\.5;padding:1px 6px;font-size:10px;border-radius:6px"\s*data-act="quick-run" data-id="t2"/.test(html));
 }
 
 // --- 2. 「直接実行」を押すとシートが開き、開始/終了/進捗メモ/完了する/キャンセルが並ぶ ---
@@ -184,6 +201,23 @@ dispatchClick("quick-run-confirm", { id:"t1" });
   const o = occs[1];
   ok("plannedStart は空欄なら null", o.plannedStart === null);
   ok("actualMin はestMin(5分)で補われる", o.actualMin === 5);
+}
+
+// --- 5. v3.198: 完了型タスクで「直接実行」→「完了する」すると、
+//          toggle-occ-doneの完了側と同じくt.done=trueになり、完了型一覧
+//          （singlesOpen = !t.done）から消える。 ---
+dispatchClick("quick-run", { id:"t2" });
+sandbox.document.getElementById("qrStart").value = "";
+sandbox.document.getElementById("qrEnd").value = "";
+sandbox.document.getElementById("qrNote").value = "";
+dispatchClick("quick-run-confirm", { id:"t2" });
+{
+  const t2 = T.db.tasks.find(x=>x.id==="t2");
+  ok("完了型タスクを直接実行すると t.done が true になる", t2.done === true);
+  T.state.tasksView = "single";
+  T.renderTasks();
+  const html = sandbox.document.getElementById("main").innerHTML;
+  ok("完了した完了型タスクは完了型一覧から消える", !html.includes('data-id="t2">直接実行'));
 }
 
 console.log(fail === 0 ? "\nALL PASS" : `\n${fail} FAILURES`);
