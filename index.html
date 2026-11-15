@@ -664,13 +664,17 @@
   .ti-start{color:var(--faint)}
   /* 完了型タスク行のメタ: 重要度 / 開始 / 期限 / カテゴリ を固定幅で並べる。
      日付の桁数が変わっても各枠の位置・幅が全タスクで揃うよう、grid の列幅を固定する。
-     grid3 は ToDoリストのカード用（v3.67〜）— カテゴリを省いた重要度/開始/期限の3列。 */
+     grid3 は ToDoリストのカード用（v3.67〜）— カテゴリを省いた重要度/開始/期限の3列。
+     v3.200: 開始/期限の列は72pxだったが、`mdShort`から年表示を外したことで
+     最長ケースが「YY/M/D」(実測76px、実は72pxでも収まっていなかった)から
+     「M/D」(実測60px)まで縮んだため、64pxに詰めて空いた分を他に回せるように
+     した（上旬/中旬/下旬/月の表示はいずれも56px以下なのでこの変更の影響なし）。 */
   .ti-meta.grid4{
-    display:grid;grid-template-columns:40px 72px 72px 44px;
+    display:grid;grid-template-columns:40px 64px 64px 44px;
     gap:3px;align-items:center;justify-content:start;overflow:hidden;
   }
   .ti-meta.grid3{
-    display:grid;grid-template-columns:40px 72px 72px;
+    display:grid;grid-template-columns:40px 64px 64px;
     gap:3px;align-items:center;justify-content:start;overflow:hidden;
   }
   .ti-meta.grid4 > *, .ti-meta.grid3 > *{min-width:0}
@@ -1110,7 +1114,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.199";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.200";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1996,14 +2000,17 @@ const dateLabel = (s, prec) => {
   if(!prec || prec==="day") return `${yr}${+m}/${+d}`;
   return `${yr}${+m}月${PREC_SUF_SHORT[prec] ? PREC_LABEL[prec] : ""}`;
 };
-/* 一覧の枠用に短く: 今年は M/D、他年は YY/M/D。粒度ありは M月 / M上 / M中 / M下。 */
+/* 一覧の枠用に短く: M/D。粒度ありは M月 / M B/M/E。
+   v3.200: 年は表示しない——タップして編集シートを開けば正確な年月（dateLabel側、
+   今年以外は「YYYY年」付き）が分かるため、一覧の枠では年違いかどうかの区別は
+   不要と判断（指示による）。年を外すことで最長ケースが「YY/M/D」から「M/D」
+   （実測60px程度）まで縮み、枠の固定幅も詰められるようになった。 */
 const mdShort = (s, prec) => {
   if(!s) return "";
-  const [y,m,d] = s.split("-");
-  const yr = (+y) !== new Date().getFullYear() ? `${y.slice(2)}/` : "";
-  if(!prec || prec==="day") return `${yr}${+m}/${+d}`;
-  if(prec==="month") return `${yr}${+m}月`;
-  return `${yr}${+m} ${PREC_SUF_SHORT[prec]}`;
+  const [, m, d] = s.split("-");
+  if(!prec || prec==="day") return `${+m}/${+d}`;
+  if(prec==="month") return `${+m}月`;
+  return `${+m} ${PREC_SUF_SHORT[prec]}`;
 };
 
 /* 期限（完了型タスクの任意フィールド）: バケット 0=期限切れ/今日 1=7日以内 2=先 3=なし */
