@@ -1110,7 +1110,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.198";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.199";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -2897,6 +2897,15 @@ function renderTasks(){
     // 行全体を <div data-act="edit-task"> にして、クリック委譲はそのまま活かす
     // （メモトグル自身がタップされた時はそちらの data-act が優先される）。
     const T = todayStr();
+    // v3.199: 「全てのボタンが一行に収まりそうに見える。メモの有無にかかわらず
+    // 一行で収まるように。配置位置もどのタスクでも揃うように」との指示。
+    // それまでのflex-wrap:wrapだと、メモ有りの行だけ（grid4＋メモトグル分だけ
+    // 幅が増えるため）狭い画面で折り返され、メモ無しの行とボタンの位置が
+    // ずれてしまっていた。flex-wrap:nowrapに変え、折り返す代わりに
+    // 「メモ▼/▲」側だけが縮む（min-width:0+text-overflow:ellipsis）ようにし、
+    // grid4（重要度/開始/期限/カテゴリ、他の行と位置を揃えるための固定幅）と
+    // 「直接実行」ボタン自体はflex:noneで常に同じ幅のまま——結果、ボタンは
+    // メモの有無を問わずどの行でも行の右端の同じ位置に来る。
     const singleRow = t => {
       const latestOcc = latestOccOf(t.id);
       const note = t.note || "";
@@ -2909,15 +2918,15 @@ function renderTasks(){
         ${inTodayList?`<span class="task-today-flag"></span>`:""}
         <div style="flex:1;min-width:0">
           <div class="ti-name">${esc(t.name)}</div>
-          <div class="ti-meta-row" style="justify-content:space-between;flex-wrap:wrap">
-            <div style="display:flex;align-items:center;gap:6px;min-width:0">
-              <div class="ti-meta grid4">
+          <div class="ti-meta-row" style="justify-content:space-between;flex-wrap:nowrap">
+            <div style="display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden">
+              <div class="ti-meta grid4" style="flex:none">
                 <span class="tf-prio">${prioChip(t)}</span>
                 ${fieldChip("開始", mdShort(t.startDate, t.startPrec))}
                 ${fieldChip("期限", mdShort(t.due, t.duePrec), dueClass(t.due))}
                 <span class="ti-cat">${esc(t.category||"—")}</span>
               </div>
-              ${hasNote?`<button class="note-toggle" data-act="toggle-note" data-id="${t.id}">メモ ${noteOpen?"▲":"▼"}</button>`:""}
+              ${hasNote?`<button class="note-toggle" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" data-act="toggle-note" data-id="${t.id}">メモ ${noteOpen?"▲":"▼"}</button>`:""}
             </div>
             <button type="button" class="btn ghost tiny" style="flex:none;border:1px solid var(--hairline);line-height:1.5;padding:1px 6px;font-size:10px;border-radius:6px" data-act="quick-run" data-id="${t.id}">直接実行</button>
           </div>
@@ -2984,10 +2993,10 @@ function renderTasks(){
         ${inTodayList?`<span class="task-today-flag"></span>`:""}
         <div style="flex:1;min-width:0">
           <div class="ti-name">${esc(t.name)}</div>
-          <div class="ti-meta-row" style="justify-content:space-between">
-            <div style="display:flex;align-items:center;gap:6px">
-              <div class="ti-meta">${rtypeChip(t)}${badge}<span class="ti-cat">${esc(t.category||"—")}</span></div>
-              ${hasNote?`<button class="note-toggle" data-act="toggle-note" data-id="${t.id}">メモ ${noteOpen?"▲":"▼"}</button>`:""}
+          <div class="ti-meta-row" style="justify-content:space-between;flex-wrap:nowrap">
+            <div style="display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden">
+              <div class="ti-meta" style="flex:none">${rtypeChip(t)}${badge}<span class="ti-cat">${esc(t.category||"—")}</span></div>
+              ${hasNote?`<button class="note-toggle" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" data-act="toggle-note" data-id="${t.id}">メモ ${noteOpen?"▲":"▼"}</button>`:""}
             </div>
             <button type="button" class="btn ghost tiny" style="flex:none;border:1px solid var(--hairline);line-height:1.5;padding:1px 6px;font-size:10px;border-radius:6px" data-act="quick-run" data-id="${t.id}">直接実行</button>
           </div>

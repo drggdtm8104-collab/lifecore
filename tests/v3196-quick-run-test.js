@@ -82,6 +82,10 @@ function dispatchClick(dataAct, extra){
 // v3.198: 「完了型タスクにも同じように」との指示で、完了型タスク一覧にも
 // 同じボタンを追加。完了型は完了するとt.done=trueで一覧から消える点が
 // 継続型と違うため、その挙動も確認する。
+// v3.199: 「メモの有無にかかわらず一行で収まるように、位置も揃うように」
+// との指示で、ti-meta-rowをflex-wrap:nowrapに変更。種類/頻度/カテゴリの
+// グループと「直接実行」ボタンはflex:noneで固定幅、メモトグルだけが
+// min-width:0+ellipsisで縮む側になった。
 
 T.db.tasks = [
   { id:"t1", name:"水を飲む", kind:"repeat", freq:{type:"daily"}, estMin:5, category:"健康", note:"", due:null, duePrec:"day", prio:"low", startDate:null, startPrec:"day", rtype:"routine", done:false, createdAt:today },
@@ -105,8 +109,12 @@ T.renderTasks();
   const idxQuickRun = html.indexOf('data-act="quick-run"');
   ok("「直接実行」はti-meta-row（種類/頻度/カテゴリの行）の中、右側にある",
     idxMetaRow !== -1 && idxQuickRun > idxMetaRow);
-  ok("ti-meta-rowは両端揃え（justify-content:space-between）で右側に寄せている",
-    /class="ti-meta-row" style="justify-content:space-between"/.test(html));
+  // v3.199: 「メモの有無にかかわらず一行で収まるように、位置も揃うように」
+  // との指示で、flex-wrap:wrapをnowrapに変更（折り返させない）。
+  ok("ti-meta-rowは両端揃え・折り返し無し（justify-content:space-between;flex-wrap:nowrap）",
+    /class="ti-meta-row" style="justify-content:space-between;flex-wrap:nowrap"/.test(html));
+  ok("種類/頻度/カテゴリのグループ(.ti-meta)は幅が固定（flex:none、縮んでボタンの位置がずれないように）",
+    /class="ti-meta" style="flex:none"/.test(html));
   // v3.196追記: 「ボタンに枠を付けて。種類や頻度の枠を参照」との指示で、
   // 枠（border）を追加。高さを種類(.ti-rtype: border:1px solid var(--hairline);
   // padding:1px 6px;font-size:10px)と完全に同じ値にすることで、枠を足しても
@@ -128,19 +136,21 @@ T.renderTasks();
   // 「直接実行」が先に出てきてしまい、t3の行の中の並びを正しく見られない）。
   const rowStart = html.indexOf("メモ付きタスク");
   const row = html.slice(rowStart);
-  const idxWrapGroup = row.indexOf('style="display:flex;align-items:center;gap:6px"');
+  const idxWrapGroup = row.indexOf('style="display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden"');
   const idxTiMeta = row.indexOf('class="ti-meta"');
   const idxNoteToggle = row.indexOf('class="note-toggle"');
   const idxQuickRun = row.indexOf('data-act="quick-run"');
   ok("「メモ」トグルは種類/頻度と同じ左側のグループに入っている（種類→メモ→直接実行の順）",
     rowStart !== -1 && idxWrapGroup !== -1 && idxWrapGroup < idxTiMeta && idxTiMeta < idxNoteToggle && idxNoteToggle < idxQuickRun);
+  // v3.199: メモトグル自身は縮んで省略（…）されてもよい唯一の要素——
+  // min-width:0+overflow:hidden+ellipsisで、狭い画面ではこれだけが縮み、
+  // 種類/頻度のグループと「直接実行」ボタンの幅・位置は変わらない。
+  ok("「メモ」トグルだけが縮小・省略可能（min-width:0+ellipsis）になっている",
+    /class="note-toggle" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"/.test(row));
 }
 
 // --- 1c. v3.198: 「完了型タスクにも同じように、直接実行ボタンを実装して」
-//          との指示で、完了型タスク一覧の行にも同じボタンを追加した。
-//          grid4（重要度/開始/期限/カテゴリの固定幅グリッド）が継続型より
-//          横に広いため、ti-meta-rowにflex-wrap:wrapを足して、幅が足りない
-//          画面では「直接実行」だけ折り返せるようにしている。 ---
+//          との指示で、完了型タスク一覧の行にも同じボタンを追加した。 ---
 T.state.tasksView = "single";
 T.renderTasks();
 {
@@ -151,10 +161,29 @@ T.renderTasks();
   const idxQuickRun = html.indexOf('data-act="quick-run"');
   ok("完了型でも「直接実行」はti-meta-rowの中、右側にある",
     idxMetaRow !== -1 && idxQuickRun > idxMetaRow);
-  ok("完了型のti-meta-rowも両端揃え＋折り返し可にしている",
-    /class="ti-meta-row" style="justify-content:space-between;flex-wrap:wrap"/.test(html));
+  // v3.199: 完了型はgrid4（重要度/開始/期限/カテゴリの固定幅グリッド）が
+  // 継続型より横に広く、メモ付きの行だけ折り返ってボタン位置がずれていた。
+  // flex-wrap:nowrapにし、grid4自体もflex:noneで固定、縮む余地が必要な時は
+  // メモトグルだけが縮む（ellipsis）ようにして、ボタンの位置を完了型でも
+  // 継続型と同じく常に揃えた。
+  ok("完了型のti-meta-rowも両端揃え・折り返し無し（justify-content:space-between;flex-wrap:nowrap）",
+    /class="ti-meta-row" style="justify-content:space-between;flex-wrap:nowrap"/.test(html));
+  ok("完了型のgrid4（重要度/開始/期限/カテゴリ）も幅が固定（flex:none）",
+    /class="ti-meta grid4" style="flex:none"/.test(html));
   ok("完了型の「直接実行」ボタンも継続型と同じ枠・高さ",
     /style="flex:none;border:1px solid var\(--hairline\);line-height:1\.5;padding:1px 6px;font-size:10px;border-radius:6px"\s*data-act="quick-run" data-id="t2"/.test(html));
+}
+
+// --- 1d. v3.199: 完了型のメモトグルも、継続型と同じく縮小・省略可能に
+//          なっている（grid4は固定のまま、メモだけが縮む側）。 ---
+T.db.tasks.push({ id:"t4", name:"メモ付き完了型タスク", kind:"single", freq:null, estMin:30, category:"学習", note:"固定メモ", due:null, duePrec:"day", prio:"low", startDate:null, startPrec:"day", rtype:null, done:false, createdAt:today });
+T.renderTasks();
+{
+  const html = sandbox.document.getElementById("main").innerHTML;
+  const rowStart = html.indexOf("メモ付き完了型タスク");
+  const row = html.slice(rowStart);
+  ok("完了型の「メモ」トグルも縮小・省略可能（min-width:0+ellipsis）になっている",
+    rowStart !== -1 && /class="note-toggle" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"/.test(row));
 }
 
 // --- 2. 「直接実行」を押すとシートが開き、開始/終了/進捗メモ/完了する/キャンセルが並ぶ ---
