@@ -457,6 +457,10 @@
   .btn.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
   .btn.ghost{border-color:transparent;color:var(--muted)}
   .btn.tiny{min-height:26px;padding:3px 9px;font-size:11px}
+  /* v3.202: 継続型タスクの並べ替えシートで、一番上/一番下のタスクには
+     「上へ」「下へ」ボタンを押せないようにする（disabled属性）——その見た目。 */
+  .btn:disabled{opacity:.35}
+  .btn:disabled:active{transform:none}
 
   .untimed{display:flex;flex-direction:column;gap:7px;margin-top:4px}
 
@@ -1120,7 +1124,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.201";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.202";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1260,6 +1264,11 @@ const CONTAMINATED_TASK_IDS = new Set([
   "0e066a0a","6ca52970","de034bc5","b7d93ef3","bd1e3de8","4c90888d","5577b559","1d564984","0de1a48a",
   "07858496","24446b30","5602f258","b269b4a8","7ffaf36e","06df156f","c9221e46","a94c6bc0","2acda6e8",
 ]);
+// v3.202: 継続型タスクの並べ替え機能用。migrate()がt.orderの既定値（旧来の
+// 登録順）を組み立てる際に使うため、CONTAMINATED_TASK_IDSと同じ理由で
+// loadLocal()呼び出しより前にここで宣言する必要がある（constはTDZがあり、
+// 定義より前の行からは参照できない）。
+const byCreated = (a,b) => (a.createdAt||"").localeCompare(b.createdAt||"");
 let db = loadLocal();
 let state = { tab:"today", todayView:"timeline", tplView:"timeline", tasksView:"single", taskSort:"default", pickView:"single", pickSort:"default", tplPickView:"single", tplPickSort:"default", noteId:null, notesView:"notes", date: todayStr(), histSpan:"day", histDate: todayStr(), histView:"records", settingsTplId:null, _setOpen:new Set(), _noteOpen:new Set(), _tplDraft:null, _highlightOccId:null, _notePopoutId:null, _pickReturn:false };
 
@@ -1396,6 +1405,19 @@ function migrate(d){
     // 自体が無くなったため「不定期」に読み替える——perWeekで持っていた
     // n（週の目標回数）は捨てる。
     if(t.kind==="repeat" && t.freq?.type==="perWeek") t.freq = { type:"irregular" };
+  });
+  // v3.202: 「継続タスクを任意に並べ替えられるようにしたい」との指示で、
+  // 継続型タスクにt.order（rtypeグループ内の表示順、整数）を新設した。
+  // 持たないタスク（旧データ）には、これまでの既定順（rtypeグループごとに
+  // createdAtの昇順）をそのままorderとして焼き込む——導入前後で見た目の
+  // 順番が変わらないようにするため。
+  ["routine","skill"].forEach(rt=>{
+    const have = d.tasks.filter(t=>t.kind==="repeat" && (t.rtype||"routine")===rt && t.order!=null);
+    let next = have.length ? Math.max(...have.map(t=>t.order)) + 1 : 0;
+    d.tasks
+      .filter(t=>t.kind==="repeat" && (t.rtype||"routine")===rt && t.order==null)
+      .sort(byCreated)
+      .forEach(t=>{ t.order = next++; });
   });
   // v3.102: v3.100で進捗メモの参照先を「今日の実施」から「一番新しい実施」に
   // 変えたが、それより前（またはv3.101のcarry-forward修正が効く前）に空の
@@ -2096,7 +2118,10 @@ const fieldChip = (label, val, cls="") =>
      - 期限順側: 開始時期の設定が「ある」ものを優先して開始時期の早い順に
        並べ、「ない」ものは後ろへ（可否は問わず設定の有無だけで2段階） */
 const byDueOnly = (a,b) => (a.due||"9999-99-99").localeCompare(b.due||"9999-99-99");
-const byCreated = (a,b) => (a.createdAt||"").localeCompare(b.createdAt||"");
+/* v3.202: 継続型タスクの任意並べ替え機能用。rtypeグループ内での表示順は
+   t.order（整数、小さいほど上）で決める——旧来のbyCreated（登録順固定）に
+   代わる並び順。同値（本来起きない想定だが保険）はbyCreatedで安定させる。 */
+const byOrder = (a,b) => (a.order ?? 0) - (b.order ?? 0) || byCreated(a,b);
 const startBucketForPrio = t => !t.startDate ? 1 : (t.startDate <= todayStr() ? 0 : 2);
 const byStartForPrio = (a,b) => startBucketForPrio(a) - startBucketForPrio(b) || (a.startDate||"").localeCompare(b.startDate||"");
 const startBucketForDue = t => t.startDate ? 0 : 1;
@@ -3020,11 +3045,19 @@ function renderTasks(){
       </div>`;
     };
     // v3.93: 種類のグループ順を「ルーティン→スキル」に変更（旧: スキル→ルーティン）。
-    // 各グループ内は登録が古い順（createdAtの昇順）に明示的に並べる。
+    // v3.202: 各グループ内の並び順は、以前は登録が古い順（createdAtの昇順）
+    // 固定だったが、「継続タスクを任意に並べ替えられるようにしたい」との
+    // 指示で、t.orderによる任意順（「並べ替え」ボタン→sheetReorderRepeats()
+    // で変更）に変わった。
     const rtypeGroups = [["routine","ルーティン"],["skill","スキル"]];
     const present = rtypeGroups.filter(([key])=>repeats.some(t=>(t.rtype||"routine")===key));
+    if(repeats.length){
+      html += `<div style="display:flex;justify-content:flex-end;margin:2px 0 8px">
+        <button type="button" class="btn ghost tiny" data-act="open-reorder-repeats">並べ替え</button>
+      </div>`;
+    }
     html += present.map(([key,label])=>{
-      const items = repeats.filter(t=>(t.rtype||"routine")===key).sort(byCreated);
+      const items = repeats.filter(t=>(t.rtype||"routine")===key).sort(byOrder);
       return `<div class="due-head">${label}<span>${items.length}</span></div><div class="tasklist">${items.map(repeatRow).join("")}</div>`;
     }).join("") || `<div class="tasklist"><div class="empty">継続型タスクはまだありません。右下の＋から追加できます。</div></div>`;
   }
@@ -3664,7 +3697,7 @@ function sheetTplTaskPick(){
     const rtypeGroups = [["routine","ルーティン"],["skill","スキル"]];
     const present = rtypeGroups.filter(([key])=>cands.some(t=>(t.rtype||"routine")===key));
     body = present.map(([key,label])=>{
-      const items = cands.filter(t=>(t.rtype||"routine")===key).sort(byCreated);
+      const items = cands.filter(t=>(t.rtype||"routine")===key).sort(byOrder);
       return `<div class="due-head">${label}<span>${items.length}</span></div><div>${items.map(candRow).join("")}</div>`;
     }).join("");
   }
@@ -3800,7 +3833,7 @@ function sheetTodayPick(){
     const rtypeGroups = [["routine","ルーティン"],["skill","スキル"]];
     const present = rtypeGroups.filter(([key])=>cands.some(t=>(t.rtype||"routine")===key));
     body = present.map(([key,label])=>{
-      const items = cands.filter(t=>(t.rtype||"routine")===key).sort(byCreated);
+      const items = cands.filter(t=>(t.rtype||"routine")===key).sort(byOrder);
       return `<div class="due-head">${label}<span>${items.length}</span></div><div>${items.map(candRow).join("")}</div>`;
     }).join("");
   }
@@ -4025,6 +4058,56 @@ function sheetQuickRun(taskId){
     </div>`);
 }
 
+// v3.202: 「継続タスクを任意に並べ替えられるようにしたい」との指示。
+// ドラッグ&ドロップはスマホでのスクロールと操作が競合しやすいため避け、
+// タスク一覧の画面自体は変えず、専用のシート（この並べ替え画面）を別に
+// 用意した。「画面をあまり複雑にしたくないが、上下移動と最上下に移動の
+// 両方があると楽そう」との指示どおり、▲▲（最上へ）▲（1つ上）▼（1つ下）
+// ▼▼（最下へ）の4ボタンにしている。並べ替えはrtypeグループ（ルーティン／
+// スキル）ごとに独立——タスク一覧・候補一覧でも常にこの2グループで分けて
+// 表示しているため、グループをまたいだ順序に意味が無い。
+function sheetReorderRepeats(){
+  const rtypeGroups = [["routine","ルーティン"],["skill","スキル"]];
+  const present = rtypeGroups.filter(([key])=>db.tasks.some(t=>t.kind==="repeat" && (t.rtype||"routine")===key));
+  const groupHTML = ([key,label]) => {
+    const items = db.tasks.filter(t=>t.kind==="repeat" && (t.rtype||"routine")===key).sort(byOrder);
+    const rows = items.map((t,i)=>{
+      const atTop = i===0, atBottom = i===items.length-1;
+      return `<div class="task-item" style="justify-content:space-between;cursor:default">
+        <span class="ti-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.name)}</span>
+        <div style="display:flex;gap:4px;flex:none">
+          <button type="button" class="btn ghost tiny" data-act="reorder-top" data-id="${t.id}" ${atTop?"disabled":""}>▲▲</button>
+          <button type="button" class="btn ghost tiny" data-act="reorder-up" data-id="${t.id}" ${atTop?"disabled":""}>▲</button>
+          <button type="button" class="btn ghost tiny" data-act="reorder-down" data-id="${t.id}" ${atBottom?"disabled":""}>▼</button>
+          <button type="button" class="btn ghost tiny" data-act="reorder-bottom" data-id="${t.id}" ${atBottom?"disabled":""}>▼▼</button>
+        </div>
+      </div>`;
+    }).join("");
+    return `<div class="due-head">${label}<span>${items.length}</span></div><div class="tasklist">${rows}</div>`;
+  };
+  openSheet(`<h2>継続型タスクの並べ替え</h2>
+    <p class="sheet-sub">タスク一覧・候補一覧での並び順を変えられます（ルーティン／スキルそれぞれの中で並べ替え）。</p>
+    ${present.map(groupHTML).join("") || `<p class="sheet-sub">継続型タスクがありません。</p>`}
+    <div class="sheet-actions"><button class="btn primary" data-act="close-sheet">閉じる</button></div>`);
+}
+/* 並べ替え操作の本体。グループ内をorder順に並べた配列から対象タスクを
+   抜き出して目的の位置へ差し込み、グループ全員のorderを0から振り直す
+   （常に0..n-1の連番に保つことで、次回の並べ替えも単純な配列操作で済む）。 */
+function moveRepeatTask(taskId, dir){
+  const t = db.tasks.find(x=>x.id===taskId);
+  if(!t || t.kind!=="repeat") return;
+  const key = t.rtype || "routine";
+  const group = db.tasks.filter(x=>x.kind==="repeat" && (x.rtype||"routine")===key).sort(byOrder);
+  const idx = group.findIndex(x=>x.id===taskId);
+  if(idx===-1) return;
+  group.splice(idx,1);
+  if(dir==="top") group.unshift(t);
+  else if(dir==="bottom") group.push(t);
+  else if(dir==="up") group.splice(Math.max(0, idx-1), 0, t);
+  else group.splice(Math.min(group.length, idx+1), 0, t);
+  group.forEach((x,i)=>{ x.order = i; });
+}
+
 /* -- new / edit task -- */
 function sheetTask(taskId){
   const t = taskId ? db.tasks.find(x=>x.id===taskId) : null;
@@ -4178,10 +4261,19 @@ function saveTaskFromForm(id){
   let t;
   if(id){
     t = db.tasks.find(x=>x.id===id);
+    const prevKey = t.kind==="repeat" ? (t.rtype||"routine") : null;
     Object.assign(t, { name, kind, estMin, category:cat, freq, note, due, duePrec, prio, startDate, startPrec, rtype, weight });
+    // v3.202: 継続型のまま種類（ルーティン/スキル）が変わった場合は、
+    // 元のグループでのt.orderが別グループでは無意味なので、移った先の
+    // グループの末尾に送る（新規タスクと同じ扱い）。
+    if(kind==="repeat" && prevKey !== (rtype||"routine")) t.order = null;
   } else {
     t = { id:uid(), name, kind, freq, estMin, category:cat, note, due, duePrec, prio, startDate, startPrec, rtype, weight, done:false, createdAt:todayStr() };
     db.tasks.push(t);
+  }
+  if(kind==="repeat" && t.order==null){
+    const siblings = db.tasks.filter(x=>x.kind==="repeat" && x.id!==t.id && (x.rtype||"routine")===(rtype||"routine"));
+    t.order = siblings.length ? Math.max(...siblings.map(x=>x.order ?? 0)) + 1 : 0;
   }
   // v3.66: 今日の実施の進捗メモ（あれば）も一緒に保存 — ToDoリストのカードの
   // 編集画面と同じ occurrence.note を書き換える（連動）
@@ -4576,6 +4668,12 @@ document.addEventListener("click", e=>{
 
     case "new-task": sheetTask(null); break;
     case "edit-task": sheetTask(id); break;
+    case "open-reorder-repeats": sheetReorderRepeats(); break;
+    case "reorder-top": case "reorder-up": case "reorder-down": case "reorder-bottom": {
+      moveRepeatTask(id, act.slice("reorder-".length));
+      save(); sheetReorderRepeats(); render();
+      break;
+    }
     case "toggle-note": {
       if(!state._noteOpen) state._noteOpen = new Set();
       state._noteOpen.has(id) ? state._noteOpen.delete(id) : state._noteOpen.add(id);

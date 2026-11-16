@@ -113,14 +113,18 @@ function check(name, cond){
   check("byDueFlat: due date is primary axis", JSON.stringify(sorted) === JSON.stringify(["due1","due2"]));
 }
 
-// ---- 継続型: routine group before skill group; each sorted by createdAt asc ----
+// ---- 継続型: routine group before skill group; each sorted within group ----
+// v3.202: グループ内の並び順がcreatedAt固定(byCreated)から任意順(byOrder、
+// 「並べ替え」シートで変更可能)に変わったため、チェックする並び替え関数名も
+// byOrderに更新——「ルーティンが先」というグループ順自体(v3.93の本来の
+// 確認対象)は変わっていない。
 {
   const src2 = sandbox.renderTasks.toString();
-  check("renderTasks: routine group listed before skill group", src2.indexOf('["routine","ルーティン"]') < src2.indexOf('["skill","スキル"]') && src2.includes('.sort(byCreated)'));
+  check("renderTasks: routine group listed before skill group", src2.indexOf('["routine","ルーティン"]') < src2.indexOf('["skill","スキル"]') && src2.includes('.sort(byOrder)'));
 }
 {
   const src3 = sandbox.sheetTodayPick.toString();
-  check("sheetTodayPick: routine group listed before skill group", src3.indexOf('["routine","ルーティン"]') < src3.indexOf('["skill","スキル"]') && src3.includes('.sort(byCreated)'));
+  check("sheetTodayPick: routine group listed before skill group", src3.indexOf('["routine","ルーティン"]') < src3.indexOf('["skill","スキル"]') && src3.includes('.sort(byOrder)'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
