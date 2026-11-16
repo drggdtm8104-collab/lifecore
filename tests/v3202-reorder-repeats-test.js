@@ -163,6 +163,11 @@ T.sheetReorderRepeats();
 {
   const html = sheetEl.innerHTML;
   ok("並べ替えシートの見出しが出る", html.includes("<h2>継続型タスクの並べ替え</h2>"));
+  // v3.203: 「並び替えの閉じるボタンは画面の上の方に固定で配置して」との
+  // 指示で、.sheet-sticky-head（タスク登録シート等と同じ、スクロールしても
+  // 常に見える見出し＋ボタンのパーツ）に変更した。
+  ok("「閉じる」ボタンは見出しと同じ固定ヘッダー(.sheet-sticky-head)の中にある",
+    /<div class="sheet-sticky-head">\s*<h2>継続型タスクの並べ替え<\/h2>\s*<div class="sheet-sticky-actions"><button class="btn tiny" data-act="close-sheet">閉じる<\/button><\/div>\s*<\/div>/.test(html));
   ok("先頭(A)の「最上へ」「上へ」はdisabled", new RegExp(`data-act="reorder-top" data-id="a" disabled`).test(html) && new RegExp(`data-act="reorder-up" data-id="a" disabled`).test(html));
   ok("先頭(A)の「下へ」「最下へ」はdisabledではない", !new RegExp(`data-act="reorder-down" data-id="a" disabled`).test(html) && !new RegExp(`data-act="reorder-bottom" data-id="a" disabled`).test(html));
   ok("末尾(C)の「下へ」「最下へ」はdisabled", new RegExp(`data-act="reorder-down" data-id="c" disabled`).test(html) && new RegExp(`data-act="reorder-bottom" data-id="c" disabled`).test(html));

@@ -1124,7 +1124,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.202";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.203";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -4085,10 +4085,15 @@ function sheetReorderRepeats(){
     }).join("");
     return `<div class="due-head">${label}<span>${items.length}</span></div><div class="tasklist">${rows}</div>`;
   };
-  openSheet(`<h2>継続型タスクの並べ替え</h2>
+  // v3.203: 「並び替えの閉じるボタンは画面の上の方に固定で配置して」との
+  // 指示。タスクを登録／編集シートなどと同じ.sheet-sticky-head（見出し＋
+  // ボタンをスクロールしても常に見える位置に固定する既存パーツ）を使う。
+  openSheet(`<div class="sheet-sticky-head">
+      <h2>継続型タスクの並べ替え</h2>
+      <div class="sheet-sticky-actions"><button class="btn tiny" data-act="close-sheet">閉じる</button></div>
+    </div>
     <p class="sheet-sub">タスク一覧・候補一覧での並び順を変えられます（ルーティン／スキルそれぞれの中で並べ替え）。</p>
-    ${present.map(groupHTML).join("") || `<p class="sheet-sub">継続型タスクがありません。</p>`}
-    <div class="sheet-actions"><button class="btn primary" data-act="close-sheet">閉じる</button></div>`);
+    ${present.map(groupHTML).join("") || `<p class="sheet-sub">継続型タスクがありません。</p>`}`);
 }
 /* 並べ替え操作の本体。グループ内をorder順に並べた配列から対象タスクを
    抜き出して目的の位置へ差し込み、グループ全員のorderを0から振り直す
