@@ -1128,7 +1128,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.205";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.206";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -4591,7 +4591,20 @@ document.addEventListener("click", e=>{
     // 正しく繰り上がる（0〜1439分の範囲で巡回）。
     case "time-step": {
       const inp = document.getElementById(id);
-      if(!inp || !inp.value) break;
+      if(!inp) break;
+      if(!inp.value){
+        // v3.206: 終了欄が空欄のままこのボタンを押しても、基準になる
+        // 時刻が無く何も起きなかった。対になる開始欄（例: mkEnd→mkStart）
+        // に値があれば、それを基準値として使う——「終了を設定するとき
+        // 開始時間がデフォルトでそこから変更できるように」を、終了側の
+        // ボタンを押した瞬間にその場で適用する経路（開始側のchange/input
+        // イベントが発火しているかどうかに依存しない）。
+        if(/End$/.test(id)){
+          const startEl = document.getElementById(id.replace(/End$/, "Start"));
+          if(startEl && startEl.value) inp.value = startEl.value;
+        }
+        if(!inp.value) break;
+      }
       const signBtn = document.getElementById(id + "Sign");
       const sign = (signBtn && signBtn.dataset.sign === "-1") ? -1 : 1;
       const [hh,mm] = inp.value.split(":").map(Number);
@@ -4601,7 +4614,7 @@ document.addEventListener("click", e=>{
       // v3.205: 開始欄をこのボタンで動かした時、対になる終了欄
       // （例: mkStart→mkEnd）がまだ空欄なら、開始時刻を既定値として
       // 入れておく——change イベントは発火しないため、ここでも明示的に
-      // 伝える必要がある（下のdocument"change"リスナーと同じ考え方）。
+      // 伝える必要がある（下のdocument"change"/"input"リスナーと同じ考え方）。
       if(/Start$/.test(id)){
         const endEl = document.getElementById(id.replace(/Start$/, "End"));
         if(endEl && !endEl.value) endEl.value = inp.value;
@@ -5173,9 +5186,44 @@ document.addEventListener("focusout", e=>{
   readTplEditor();
 });
 
+// v3.205: 「開始を設定したら、終了を設定するとき開始時間がデフォルトで
+// そこから変更できるように」との指示。開始〜終了の時刻ペア（mkStart/
+// mkEnd、oeStart/oeEnd など、全てtimeRow()由来で"...Start"/"...End"の
+// 対になっている）のうち、開始欄が変更された時、終了欄がまだ空欄なら
+// 開始時刻を既定値として入れておく（そこから+1/+5/+30のボタンや
+// 再度のピッカー操作で調整できる）。既に終了欄に値が入っている場合は
+// 上書きしない。
+// v3.206: "change"イベントだけに反応させていたが、実機（モバイルSafari等）
+// ではネイティブの時刻ピッカーで選んでも"change"が確実に発火せず、
+// 終了欄が空欄のまま残って「空欄の時刻欄を開くとブラウザが現在時刻を
+// 表示する」という無関係な挙動に見えてしまう不具合があった。"input"でも
+// 同じ処理をするよう二重化して、どちらのイベントでも確実に反映されるようにした。
+function defaultEndFromStart(el){
+  if(!el || el.tagName !== "INPUT" || el.type !== "time") return;
+  if(!/Start$/.test(el.id) || !el.value) return;
+  const endEl = document.getElementById(el.id.replace(/Start$/, "End"));
+  if(endEl && !endEl.value) endEl.value = el.value;
+}
+
+// v3.206: 上のdefaultEndFromStart()（開始側の変更を終了側へ伝える経路）に
+// 加えて、終了欄そのものにフォーカスが入った瞬間にも同じ既定値を入れる
+// ——"focusin"はバブリングし、ネイティブの時刻ピッカーが開く前に必ず
+// 発火するため、開始側のchange/inputイベントが実機ブラウザで確実に
+// 発火するかに依存しない、最も確実な経路になる（終了欄が空欄のまま
+// ネイティブピッカーを開くと、ブラウザ標準の「現在時刻」から始まって
+// しまい、開始からの既定値に見えなかったのが今回の報告の実体）。
+document.addEventListener("focusin", e=>{
+  const el = e.target;
+  if(!el || el.tagName !== "INPUT" || el.type !== "time") return;
+  if(!/End$/.test(el.id) || el.value) return;
+  const startEl = document.getElementById(el.id.replace(/End$/, "Start"));
+  if(startEl && startEl.value) el.value = startEl.value;
+});
+
 /* メモ: 打つたびに in-memory を更新し、少し待ってから保存（再描画はしない） */
 document.addEventListener("input", e=>{
   const el = e.target;
+  defaultEndFromStart(el);
   if(el && el.id === "devMemoArea"){ settings().devMemo = el.value; scheduleNoteSave(); return; }
   if(!el || (el.id !== "noteBody" && el.id !== "noteTitle")) return;
   const n = db.notes.find(x=>x.id===state.noteId);
@@ -5192,17 +5240,7 @@ document.addEventListener("input", e=>{
 document.addEventListener("change", e=>{
   const el = e.target;
   if(!el) return;
-  // v3.205: 「開始を設定したら、終了を設定するとき開始時間がデフォルトで
-  // そこから変更できるように」との指示。開始〜終了の時刻ペア（mkStart/
-  // mkEnd、oeStart/oeEnd など、全てtimeRow()由来で"...Start"/"...End"の
-  // 対になっている）のうち、開始欄をネイティブの時刻ピッカーで直接
-  // 変更した時、終了欄がまだ空欄なら開始時刻を既定値として入れておく
-  // （そこから+1/+5/+30のボタンや再度のピッカー操作で調整できる）。
-  // 既に終了欄に値が入っている場合は上書きしない。
-  if(el.tagName === "INPUT" && el.type === "time" && /Start$/.test(el.id) && el.value){
-    const endEl = document.getElementById(el.id.replace(/Start$/, "End"));
-    if(endEl && !endEl.value) endEl.value = el.value;
-  }
+  defaultEndFromStart(el);
   if(el.id !== "importFile") return;
   const file = el.files && el.files[0];
   if(!file) return;
