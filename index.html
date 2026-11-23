@@ -1128,7 +1128,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.204";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.205";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -4598,6 +4598,14 @@ document.addEventListener("click", e=>{
       const delta = sign * (parseInt(v, 10) || 0);
       const total = ((hh*60 + mm + delta) % 1440 + 1440) % 1440;
       inp.value = pad(Math.floor(total/60)) + ":" + pad(total%60);
+      // v3.205: 開始欄をこのボタンで動かした時、対になる終了欄
+      // （例: mkStart→mkEnd）がまだ空欄なら、開始時刻を既定値として
+      // 入れておく——change イベントは発火しないため、ここでも明示的に
+      // 伝える必要がある（下のdocument"change"リスナーと同じ考え方）。
+      if(/Start$/.test(id)){
+        const endEl = document.getElementById(id.replace(/Start$/, "End"));
+        if(endEl && !endEl.value) endEl.value = inp.value;
+      }
       break;
     }
     case "time-step-sign": {
@@ -5183,7 +5191,19 @@ document.addEventListener("input", e=>{
 // でもここから先の処理は共通）。
 document.addEventListener("change", e=>{
   const el = e.target;
-  if(!el || el.id !== "importFile") return;
+  if(!el) return;
+  // v3.205: 「開始を設定したら、終了を設定するとき開始時間がデフォルトで
+  // そこから変更できるように」との指示。開始〜終了の時刻ペア（mkStart/
+  // mkEnd、oeStart/oeEnd など、全てtimeRow()由来で"...Start"/"...End"の
+  // 対になっている）のうち、開始欄をネイティブの時刻ピッカーで直接
+  // 変更した時、終了欄がまだ空欄なら開始時刻を既定値として入れておく
+  // （そこから+1/+5/+30のボタンや再度のピッカー操作で調整できる）。
+  // 既に終了欄に値が入っている場合は上書きしない。
+  if(el.tagName === "INPUT" && el.type === "time" && /Start$/.test(el.id) && el.value){
+    const endEl = document.getElementById(el.id.replace(/Start$/, "End"));
+    if(endEl && !endEl.value) endEl.value = el.value;
+  }
+  if(el.id !== "importFile") return;
   const file = el.files && el.files[0];
   if(!file) return;
   file.text().then(txt=>{
