@@ -1128,7 +1128,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.206";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.207";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -5202,23 +5202,35 @@ function defaultEndFromStart(el){
   if(!el || el.tagName !== "INPUT" || el.type !== "time") return;
   if(!/Start$/.test(el.id) || !el.value) return;
   const endEl = document.getElementById(el.id.replace(/Start$/, "End"));
-  if(endEl && !endEl.value) endEl.value = el.value;
+  if(!endEl || endEl.value) return;
+  endEl.value = el.value;
+  try{ endEl.setAttribute("value", el.value); }catch(e){}
 }
 
-// v3.206: 上のdefaultEndFromStart()（開始側の変更を終了側へ伝える経路）に
-// 加えて、終了欄そのものにフォーカスが入った瞬間にも同じ既定値を入れる
-// ——"focusin"はバブリングし、ネイティブの時刻ピッカーが開く前に必ず
-// 発火するため、開始側のchange/inputイベントが実機ブラウザで確実に
-// 発火するかに依存しない、最も確実な経路になる（終了欄が空欄のまま
-// ネイティブピッカーを開くと、ブラウザ標準の「現在時刻」から始まって
-// しまい、開始からの既定値に見えなかったのが今回の報告の実体）。
-document.addEventListener("focusin", e=>{
-  const el = e.target;
+// v3.206→v3.207: 上のdefaultEndFromStart()（開始側の変更を終了側へ伝える
+// 経路）に加えて、終了欄そのものに触れた瞬間にも同じ既定値を入れる
+// ——実機（モバイルSafari/Chrome）でv3.206の"focusin"ベースの対策でも
+// 直らなかったとの報告を受け、さらに早いタイミングのイベントに
+// 差し替えた。ネイティブの時刻ピッカー（スクロールで選ぶ画面）が
+// 開くトリガーは実装によって"focus"ではなく指が触れた瞬間の
+// "pointerdown"/"touchstart"に近いタイミングのことがあり、"focusin"
+// だと（内部的に）一瞬遅く、ピッカーが空欄のまま開く初期値を
+// 既に決めてしまっていた可能性がある。"pointerdown"（無ければ
+// "touchstart"）という、指が触れた最初の瞬間のイベントで既定値を
+// 入れることで、ピッカーが開くより確実に前に間に合わせる。
+// また、IDLプロパティ(.value)だけでなくcontent属性(value="...")も
+// 明示的に設定し、属性を見て初期表示を決める実装にも対応する。
+function maybeDefaultEnd(el){
   if(!el || el.tagName !== "INPUT" || el.type !== "time") return;
   if(!/End$/.test(el.id) || el.value) return;
   const startEl = document.getElementById(el.id.replace(/End$/, "Start"));
-  if(startEl && startEl.value) el.value = startEl.value;
-});
+  if(!startEl || !startEl.value) return;
+  el.value = startEl.value;
+  try{ el.setAttribute("value", startEl.value); }catch(e){}
+}
+document.addEventListener("pointerdown", e=>{ maybeDefaultEnd(e.target); }, true);
+document.addEventListener("touchstart", e=>{ maybeDefaultEnd(e.target); }, true);
+document.addEventListener("focusin", e=>{ maybeDefaultEnd(e.target); });
 
 /* メモ: 打つたびに in-memory を更新し、少し待ってから保存（再描画はしない） */
 document.addEventListener("input", e=>{
