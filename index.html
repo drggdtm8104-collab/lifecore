@@ -863,11 +863,9 @@
   .time-stepper-row{display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
   .time-stepper-row .ts-label{flex:none;width:34px;font-size:11.5px;color:var(--muted)}
   /* v3.159: 時刻入力は元の.time-rowと同じ固定サイズ・左詰めに戻した
-     （以前はflex:1で幅いっぱいに伸ばしていたが、指示により元のサイズへ）。 */
-  .time-stepper-row input[type="time"]{
-    flex:none;height:38px;min-height:38px;width:82px;padding:0 6px;
-    box-sizing:border-box;font-family:var(--font-mono);
-  }
+     （以前はflex:1で幅いっぱいに伸ばしていたが、指示により元のサイズへ）。
+     v3.208: 中身は.ts-input（自前ピッカーのトリガー）に変わったが、
+     サイズ指定自体はそのまま引き継いでいる（下の.ts-input参照）。 */
   .ts-btn{
     flex:none;width:34px;height:34px;border-radius:9px;
     border:1px solid var(--hairline);background:var(--surface);
@@ -943,6 +941,55 @@
     flex:1;width:100%;resize:none;padding:12px;border:1px solid var(--hairline);
     border-radius:11px;background:var(--surface);color:var(--ink);
     font-family:var(--font-body);font-size:16px;line-height:1.65;
+  }
+
+  /* v3.208: 開始/終了の時刻欄をタップしたときに出す、自前のスクロール式
+     時刻選択ピッカー。ネイティブの<input type="time">は「空欄のまま開くと
+     ブラウザが現在時刻から始める」挙動を外からJSで確実に上書きできず
+     （実機でタイミングが間に合わないことがあった）、何度直してもそこが
+     安定しなかったため、ピッカー自体を自前実装に置き換えて挙動を完全に
+     こちらで制御できるようにした。note-popoutと同じ「シートの上に重ねて
+     出すポップアウト」の構造を踏襲（z-indexだけ1段上）。 */
+  .time-wheel-wrap{position:fixed;inset:0;z-index:70;display:none}
+  .time-wheel-wrap.open{display:block}
+  .time-wheel-bg{position:absolute;inset:0;background:rgba(15,20,18,.42)}
+  .time-wheel-pop{
+    position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+    width:100%;max-width:480px;
+    background:var(--ground);
+    border-radius:18px 18px 0 0;border-top:1px solid var(--hairline);
+    padding:10px 18px calc(16px + env(safe-area-inset-bottom,0));
+    animation:rise .22s cubic-bezier(.2,.7,.3,1);
+  }
+  .tw-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .tw-head span{font-weight:600;font-size:14px}
+  .tw-cols{position:relative;display:flex;align-items:center;justify-content:center;gap:4px;height:200px}
+  .tw-center-band{
+    position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);
+    height:40px;background:var(--wash);border-radius:9px;pointer-events:none;
+  }
+  .tw-col{
+    position:relative;width:80px;height:200px;overflow-y:scroll;
+    scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    mask-image:linear-gradient(to bottom, transparent 0, #000 35%, #000 65%, transparent 100%);
+    -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 35%, #000 65%, transparent 100%);
+  }
+  .tw-col::-webkit-scrollbar{display:none}
+  .tw-item{
+    height:40px;display:flex;align-items:center;justify-content:center;
+    scroll-snap-align:center;font-family:var(--font-mono);font-size:21px;
+    font-variant-numeric:tabular-nums;color:var(--faint);
+  }
+  .tw-item.tw-spacer{visibility:hidden}
+  .tw-item.tw-sel{color:var(--ink);font-weight:700}
+  .tw-colon{flex:none;font-family:var(--font-mono);font-size:21px;color:var(--muted);font-weight:700}
+  /* timeRow()の時刻欄は、自前ピッカーのトリガーに変わった（type="text"+
+     readonly）ため、type="time"向けのスタイルとは別にこのクラスで指定する。 */
+  .ts-input{
+    flex:none;height:38px;min-height:38px;width:82px;padding:0 6px;
+    box-sizing:border-box;font-family:var(--font-mono);cursor:pointer;
+    -webkit-user-select:none;user-select:none;caret-color:transparent;
   }
 
   /* generic form controls */
@@ -1116,6 +1163,21 @@
     <textarea id="notePopoutArea"></textarea>
   </div>
 </div>
+<div class="time-wheel-wrap" id="timeWheelWrap">
+  <div class="time-wheel-bg" data-act="tw-close"></div>
+  <div class="time-wheel-pop" id="timeWheelPop" role="dialog" aria-modal="true">
+    <div class="tw-head">
+      <span id="twLabel">時刻</span>
+      <button type="button" class="btn ghost tiny" data-act="tw-close">閉じる</button>
+    </div>
+    <div class="tw-cols">
+      <div class="tw-center-band"></div>
+      <div class="tw-col" id="twHourCol"></div>
+      <div class="tw-colon">:</div>
+      <div class="tw-col" id="twMinCol"></div>
+    </div>
+  </div>
+</div>
 
 <script>
 "use strict";
@@ -1128,7 +1190,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.207";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.208";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1322,16 +1384,109 @@ const settings = () => (db.settings || (db.settings = {}));
 // あわせて、時だけ固定して分を0〜59で巡回させていた（v3.170）挙動もやめ、
 // 時を跨ぐ移動（例: 23:50に+30→翌0:20）も正しく繰り上がるようにした——
 // 「30分まとめてずらす」という使い方そのものが時をまたぐ前提のため。
+// v3.208: 時刻欄は、タップするとネイティブの時刻ピッカー（スクロールで
+// 選ぶ画面）ではなく自前のtime-wheelピッカーを開くトリガーに変えた
+// （type="text"+readonly+inputmode="none"——キーボードも出さず、
+// 表示上の見た目は変えずに値だけ.value経由で読み書きする。time-step
+// 系の既存コードは.valueを読み書きするだけなので変更不要）。
 function timeRow(label, inputId, value, extraHTML){
   return `<div class="time-stepper-row">
     <span class="ts-label">${esc(label)}</span>
-    <input type="time" id="${inputId}" value="${esc(value||"")}">
+    <input type="text" inputmode="none" readonly class="ts-input" id="${inputId}" value="${esc(value||"")}" data-act="open-time-wheel" data-id="${inputId}" data-label="${esc(label)}">
     <button type="button" class="ts-btn ts-sign" id="${inputId}Sign" data-act="time-step-sign" data-id="${inputId}" data-sign="1">+</button>
     <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="1">1</button>
     <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="5">5</button>
     <button type="button" class="ts-btn" data-act="time-step" data-id="${inputId}" data-v="30">30</button>
     ${extraHTML||""}
   </div>`;
+}
+
+/* ---------- v3.208: 自前の時刻スクロールピッカー（time-wheel） ----------
+   ネイティブの<input type="time">は「空欄のまま開くと現在時刻から始まる」
+   挙動を外部のJSから確実に上書きできなかった（実機でタイミングが間に
+   合わないことがあり、何度対策してもブラウザ・機種ごとに挙動が違った）。
+   ピッカー自体をこの自前実装に置き換えることで、開始時刻を初期値にする
+   という挙動を100%保証できるようにした。*/
+const TW_ITEM_H = 40;     // .tw-itemの高さ（CSSと一致させる）
+const TW_VISIBLE = 5;     // 一度に見える行数（奇数、中央が選択中）
+const TW_PAD = (TW_VISIBLE - 1) / 2;
+let twTargetId = null;
+let twScrollTimers = {};  // 列ごとのdebounceタイマー
+
+// 開く時点の初期値: (1) 既に値があればそれ、(2) 終了欄で開始欄に値があれば
+// それ、(3) どちらも無ければ現在時刻。
+function twInitialValue(inputId){
+  const inp = document.getElementById(inputId);
+  if(inp && inp.value) return inp.value;
+  if(/End$/.test(inputId)){
+    const startEl = document.getElementById(inputId.replace(/End$/, "Start"));
+    if(startEl && startEl.value) return startEl.value;
+  }
+  return fmtNowTime();
+}
+
+function twBuildCol(colEl, max, current){
+  let html = "";
+  for(let i=0;i<TW_PAD;i++) html += `<div class="tw-item tw-spacer"></div>`;
+  for(let i=0;i<=max;i++) html += `<div class="tw-item" data-v="${i}">${pad(i)}</div>`;
+  for(let i=0;i<TW_PAD;i++) html += `<div class="tw-item tw-spacer"></div>`;
+  colEl.innerHTML = html;
+  colEl.scrollTop = current * TW_ITEM_H;   // アニメーション無しで即座にその位置へ——
+                                            // ネイティブピッカーの初期化タイミングに
+                                            // 左右されない、この実装の核心部分。
+  twMarkSelected(colEl, current);
+}
+
+function twMarkSelected(colEl, idx){
+  const prev = colEl.querySelector(".tw-item.tw-sel");
+  if(prev) prev.classList.remove("tw-sel");
+  const cur = colEl.querySelector(`.tw-item[data-v="${idx}"]`);
+  if(cur) cur.classList.add("tw-sel");
+}
+
+function twCommit(){
+  const hourCol = document.getElementById("twHourCol");
+  const minCol = document.getElementById("twMinCol");
+  const inp = twTargetId ? document.getElementById(twTargetId) : null;
+  if(!inp || !hourCol || !minCol) return;
+  const hh = Math.max(0, Math.min(23, Math.round(hourCol.scrollTop / TW_ITEM_H)));
+  const mm = Math.max(0, Math.min(59, Math.round(minCol.scrollTop / TW_ITEM_H)));
+  inp.value = pad(hh) + ":" + pad(mm);
+}
+
+function twOnScroll(colEl, max){
+  clearTimeout(twScrollTimers[colEl.id]);
+  twScrollTimers[colEl.id] = setTimeout(()=>{
+    const idx = Math.max(0, Math.min(max, Math.round(colEl.scrollTop / TW_ITEM_H)));
+    colEl.scrollTop = idx * TW_ITEM_H;   // 吸着位置に正確にスナップし直す
+    twMarkSelected(colEl, idx);
+    twCommit();
+  }, 110);
+}
+
+function openTimeWheel(inputId, label){
+  twTargetId = inputId;
+  const triggerEl = document.getElementById(inputId);
+  if(triggerEl && triggerEl.blur) triggerEl.blur();   // 念のため（キーボード等が出ないように）
+  document.getElementById("twLabel").textContent = label || "時刻";
+  // v3.208のバグ修正: display:noneのままscrollTopを指定しても反映されない
+  // （非表示要素には「スクロールする箱」自体が無いため、代入してもその場では
+  // 何も起きない）。必ず先にopenクラスを付けて表示状態にしてから、
+  // 各列を組み立てて初期スクロール位置を指定する。
+  document.getElementById("timeWheelWrap").classList.add("open");
+  const [hh, mm] = twInitialValue(inputId).split(":").map(Number);
+  const hourCol = document.getElementById("twHourCol");
+  const minCol = document.getElementById("twMinCol");
+  twBuildCol(hourCol, 23, hh);
+  twBuildCol(minCol, 59, mm);
+  hourCol.onscroll = () => twOnScroll(hourCol, 23);
+  minCol.onscroll = () => twOnScroll(minCol, 59);
+  twCommit();   // 開いた時点で既に(開始からの既定値や現在時刻が)反映されるようにする
+}
+
+function closeTimeWheel(){
+  document.getElementById("timeWheelWrap").classList.remove("open");
+  twTargetId = null;
 }
 
 /* ---- v3.0 model migration (idempotent) ----
@@ -4583,6 +4738,11 @@ document.addEventListener("click", e=>{
       toast("時間をクリアしました（保存で確定）");
       break;
     }
+    // v3.208: 時刻欄（timeRow()由来、.ts-input）をタップした時に開く、
+    // 自前のスクロール式ピッカー。render()は呼ばない——シート側の
+    // 入力中の他の項目を消さないため（note-popoutと同じ考え方）。
+    case "open-time-wheel": openTimeWheel(id, el.dataset.label); break;
+    case "tw-close": closeTimeWheel(); break;
     // v3.158: 開始・終了それぞれの時刻入力の脇にある移動ボタン。
     // render()は呼ばない——入力中の他の項目を消さないため。
     // v3.180: 「＋／－の方向トグル」＋「1/5/30分」の組み合わせに変更
@@ -5186,56 +5346,9 @@ document.addEventListener("focusout", e=>{
   readTplEditor();
 });
 
-// v3.205: 「開始を設定したら、終了を設定するとき開始時間がデフォルトで
-// そこから変更できるように」との指示。開始〜終了の時刻ペア（mkStart/
-// mkEnd、oeStart/oeEnd など、全てtimeRow()由来で"...Start"/"...End"の
-// 対になっている）のうち、開始欄が変更された時、終了欄がまだ空欄なら
-// 開始時刻を既定値として入れておく（そこから+1/+5/+30のボタンや
-// 再度のピッカー操作で調整できる）。既に終了欄に値が入っている場合は
-// 上書きしない。
-// v3.206: "change"イベントだけに反応させていたが、実機（モバイルSafari等）
-// ではネイティブの時刻ピッカーで選んでも"change"が確実に発火せず、
-// 終了欄が空欄のまま残って「空欄の時刻欄を開くとブラウザが現在時刻を
-// 表示する」という無関係な挙動に見えてしまう不具合があった。"input"でも
-// 同じ処理をするよう二重化して、どちらのイベントでも確実に反映されるようにした。
-function defaultEndFromStart(el){
-  if(!el || el.tagName !== "INPUT" || el.type !== "time") return;
-  if(!/Start$/.test(el.id) || !el.value) return;
-  const endEl = document.getElementById(el.id.replace(/Start$/, "End"));
-  if(!endEl || endEl.value) return;
-  endEl.value = el.value;
-  try{ endEl.setAttribute("value", el.value); }catch(e){}
-}
-
-// v3.206→v3.207: 上のdefaultEndFromStart()（開始側の変更を終了側へ伝える
-// 経路）に加えて、終了欄そのものに触れた瞬間にも同じ既定値を入れる
-// ——実機（モバイルSafari/Chrome）でv3.206の"focusin"ベースの対策でも
-// 直らなかったとの報告を受け、さらに早いタイミングのイベントに
-// 差し替えた。ネイティブの時刻ピッカー（スクロールで選ぶ画面）が
-// 開くトリガーは実装によって"focus"ではなく指が触れた瞬間の
-// "pointerdown"/"touchstart"に近いタイミングのことがあり、"focusin"
-// だと（内部的に）一瞬遅く、ピッカーが空欄のまま開く初期値を
-// 既に決めてしまっていた可能性がある。"pointerdown"（無ければ
-// "touchstart"）という、指が触れた最初の瞬間のイベントで既定値を
-// 入れることで、ピッカーが開くより確実に前に間に合わせる。
-// また、IDLプロパティ(.value)だけでなくcontent属性(value="...")も
-// 明示的に設定し、属性を見て初期表示を決める実装にも対応する。
-function maybeDefaultEnd(el){
-  if(!el || el.tagName !== "INPUT" || el.type !== "time") return;
-  if(!/End$/.test(el.id) || el.value) return;
-  const startEl = document.getElementById(el.id.replace(/End$/, "Start"));
-  if(!startEl || !startEl.value) return;
-  el.value = startEl.value;
-  try{ el.setAttribute("value", startEl.value); }catch(e){}
-}
-document.addEventListener("pointerdown", e=>{ maybeDefaultEnd(e.target); }, true);
-document.addEventListener("touchstart", e=>{ maybeDefaultEnd(e.target); }, true);
-document.addEventListener("focusin", e=>{ maybeDefaultEnd(e.target); });
-
 /* メモ: 打つたびに in-memory を更新し、少し待ってから保存（再描画はしない） */
 document.addEventListener("input", e=>{
   const el = e.target;
-  defaultEndFromStart(el);
   if(el && el.id === "devMemoArea"){ settings().devMemo = el.value; scheduleNoteSave(); return; }
   if(!el || (el.id !== "noteBody" && el.id !== "noteTitle")) return;
   const n = db.notes.find(x=>x.id===state.noteId);
@@ -5252,7 +5365,6 @@ document.addEventListener("input", e=>{
 document.addEventListener("change", e=>{
   const el = e.target;
   if(!el) return;
-  defaultEndFromStart(el);
   if(el.id !== "importFile") return;
   const file = el.files && el.files[0];
   if(!file) return;
