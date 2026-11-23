@@ -82,7 +82,7 @@ try{
   process.exit(1);
 }
 vm.runInContext(`globalThis.__t = {
-  timeRow, openTimeWheel, closeTimeWheel, twInitialValue, twBuildCol, twCommit,
+  timeRow, openTimeWheel, closeTimeWheel, confirmTimeWheel, twInitialValue, twBuildCol,
   get twTargetId(){ return twTargetId; }, TW_ITEM_H,
 };`, sandbox);
 const T = sandbox.__t;
@@ -158,6 +158,8 @@ function dispatchClick(dataAct, extra){
 
 // 6) openTimeWheel(): 開始が設定済み・終了が空欄の状態で終了欄を開くと、
 //    開始時刻の位置からスクロールが始まり、見出しラベルも設定される。
+//    v3.209〜: 開いただけでは対象欄にはまだ何も書き込まれない
+//    （OK/キャンセルに変更したため——下のv3209テスト参照）。
 {
   const start = getEl("mkStart"); start.value = "11:00";
   const end = getEl("mkEnd"); end.value = "";
@@ -170,7 +172,6 @@ function dispatchClick(dataAct, extra){
   const hourCol = getEl("twHourCol"), minCol = getEl("twMinCol");
   ok("hour wheel starts scrolled to Start's hour (11)", hourCol.scrollTop === 11 * T.TW_ITEM_H);
   ok("minute wheel starts scrolled to Start's minute (00)", minCol.scrollTop === 0 * T.TW_ITEM_H);
-  ok("opening the wheel already commits that default into the target field", end.value === "11:00");
 }
 
 // 7) closeTimeWheel(): オーバーレイを閉じ、対象を見失わないようにクリアする。
@@ -186,9 +187,8 @@ function dispatchClick(dataAct, extra){
   const end = getEl("qrEnd"); end.value = "";
   dispatchClick("open-time-wheel", { id:"qrEnd", label:"終了" });
   ok("dispatching 'open-time-wheel' opens it for the clicked field", T.twTargetId === "qrEnd");
-  ok("...and defaults it from Start via the same path a real tap uses", end.value === "13:00");
-  dispatchClick("tw-close");
-  ok("dispatching 'tw-close' closes the overlay", !getEl("timeWheelWrap").classList.contains("open"));
+  dispatchClick("tw-cancel");
+  ok("dispatching 'tw-cancel' closes the overlay", !getEl("timeWheelWrap").classList.contains("open"));
 }
 
 // 9) 既存の挙動が引き続き保たれていること: 終了欄自身の+/-ボタン

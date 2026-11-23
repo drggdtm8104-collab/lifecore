@@ -985,8 +985,14 @@
   .tw-item.tw-sel{color:var(--ink);font-weight:700}
   .tw-colon{flex:none;font-family:var(--font-mono);font-size:21px;color:var(--muted);font-weight:700}
   /* timeRow()の時刻欄は、自前ピッカーのトリガーに変わった（type="text"+
-     readonly）ため、type="time"向けのスタイルとは別にこのクラスで指定する。 */
-  .ts-input{
+     readonly）ため、type="time"向けのスタイルとは別にこのクラスで指定する。
+     v3.209: .ts-inputだけ（クラス1つ、詳細度0,1,0）だと、下の generic
+     form controls の input[type="text"] 側（属性セレクタ込みで0,1,1）の
+     方が詳細度で勝ってしまい、width:100%/padding:8px 10pxに上書きされて
+     幅が崩れていた（「枠やボタンの配置を以前と同じに」との指摘で発覚）。
+     .time-stepper-row .ts-inputまで含めて詳細度を上げ、元の
+     .time-stepper-row input[type="time"]と同じ強さに戻す。 */
+  .time-stepper-row .ts-input{
     flex:none;height:38px;min-height:38px;width:82px;padding:0 6px;
     box-sizing:border-box;font-family:var(--font-mono);cursor:pointer;
     -webkit-user-select:none;user-select:none;caret-color:transparent;
@@ -1164,17 +1170,20 @@
   </div>
 </div>
 <div class="time-wheel-wrap" id="timeWheelWrap">
-  <div class="time-wheel-bg" data-act="tw-close"></div>
+  <div class="time-wheel-bg" data-act="tw-cancel"></div>
   <div class="time-wheel-pop" id="timeWheelPop" role="dialog" aria-modal="true">
     <div class="tw-head">
       <span id="twLabel">時刻</span>
-      <button type="button" class="btn ghost tiny" data-act="tw-close">閉じる</button>
     </div>
     <div class="tw-cols">
       <div class="tw-center-band"></div>
       <div class="tw-col" id="twHourCol"></div>
       <div class="tw-colon">:</div>
       <div class="tw-col" id="twMinCol"></div>
+    </div>
+    <div class="sheet-actions">
+      <button type="button" class="btn ghost" data-act="tw-cancel">キャンセル</button>
+      <button type="button" class="btn primary" data-act="tw-ok">OK</button>
     </div>
   </div>
 </div>
@@ -1190,7 +1199,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.208";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.209";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1444,14 +1453,16 @@ function twMarkSelected(colEl, idx){
   if(cur) cur.classList.add("tw-sel");
 }
 
-function twCommit(){
+// v3.209: 「閉じる」ではなくOK/キャンセルにしてほしい、との指示。
+// スクロール中は見た目（選択中セルの強調）だけ更新し、対象欄の実際の
+// 値はOKを押した時だけ書き込む——キャンセルなら何も書き込まず、
+// 対象欄は開く前の値のまま戻る。
+function twCurrentSelection(){
   const hourCol = document.getElementById("twHourCol");
   const minCol = document.getElementById("twMinCol");
-  const inp = twTargetId ? document.getElementById(twTargetId) : null;
-  if(!inp || !hourCol || !minCol) return;
   const hh = Math.max(0, Math.min(23, Math.round(hourCol.scrollTop / TW_ITEM_H)));
   const mm = Math.max(0, Math.min(59, Math.round(minCol.scrollTop / TW_ITEM_H)));
-  inp.value = pad(hh) + ":" + pad(mm);
+  return pad(hh) + ":" + pad(mm);
 }
 
 function twOnScroll(colEl, max){
@@ -1460,7 +1471,6 @@ function twOnScroll(colEl, max){
     const idx = Math.max(0, Math.min(max, Math.round(colEl.scrollTop / TW_ITEM_H)));
     colEl.scrollTop = idx * TW_ITEM_H;   // 吸着位置に正確にスナップし直す
     twMarkSelected(colEl, idx);
-    twCommit();
   }, 110);
 }
 
@@ -1481,7 +1491,12 @@ function openTimeWheel(inputId, label){
   twBuildCol(minCol, 59, mm);
   hourCol.onscroll = () => twOnScroll(hourCol, 23);
   minCol.onscroll = () => twOnScroll(minCol, 59);
-  twCommit();   // 開いた時点で既に(開始からの既定値や現在時刻が)反映されるようにする
+}
+
+function confirmTimeWheel(){
+  const inp = twTargetId ? document.getElementById(twTargetId) : null;
+  if(inp) inp.value = twCurrentSelection();
+  closeTimeWheel();
 }
 
 function closeTimeWheel(){
@@ -4742,7 +4757,8 @@ document.addEventListener("click", e=>{
     // 自前のスクロール式ピッカー。render()は呼ばない——シート側の
     // 入力中の他の項目を消さないため（note-popoutと同じ考え方）。
     case "open-time-wheel": openTimeWheel(id, el.dataset.label); break;
-    case "tw-close": closeTimeWheel(); break;
+    case "tw-ok": confirmTimeWheel(); break;
+    case "tw-cancel": closeTimeWheel(); break;
     // v3.158: 開始・終了それぞれの時刻入力の脇にある移動ボタン。
     // render()は呼ばない——入力中の他の項目を消さないため。
     // v3.180: 「＋／－の方向トグル」＋「1/5/30分」の組み合わせに変更
