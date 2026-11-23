@@ -963,6 +963,15 @@
   }
   .tw-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
   .tw-head span{font-weight:600;font-size:14px}
+  /* v3.210: 分の刻み（1分／5分）を画面上で切り替えるトグル。±ボタンは
+     「今の時刻から少しずらす」用に残したまま、こちらは「ざっくり選ぶ」
+     ときに1分ずつより速くスクロールできるようにする追加機能。 */
+  .tw-min-toggle{display:flex;gap:6px}
+  .tw-min-btn{
+    min-height:28px;padding:4px 10px;border-radius:7px;border:1px solid var(--hairline);
+    background:var(--surface);font-size:11.5px;color:var(--muted);
+  }
+  .tw-min-btn.on{background:var(--wash);border-color:transparent;color:var(--primary-ink);font-weight:600}
   .tw-cols{position:relative;display:flex;align-items:center;justify-content:center;gap:4px;height:200px}
   .tw-center-band{
     position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);
@@ -1174,6 +1183,10 @@
   <div class="time-wheel-pop" id="timeWheelPop" role="dialog" aria-modal="true">
     <div class="tw-head">
       <span id="twLabel">時刻</span>
+      <div class="tw-min-toggle" id="twMinToggle">
+        <button type="button" class="tw-min-btn on" data-act="tw-min-step" data-v="1">1分</button>
+        <button type="button" class="tw-min-btn" data-act="tw-min-step" data-v="5">5分</button>
+      </div>
     </div>
     <div class="tw-cols">
       <div class="tw-center-band"></div>
@@ -1199,7 +1212,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.209";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.210";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1421,6 +1434,12 @@ const TW_VISIBLE = 5;     // 一度に見える行数（奇数、中央が選択
 const TW_PAD = (TW_VISIBLE - 1) / 2;
 let twTargetId = null;
 let twScrollTimers = {};  // 列ごとのdebounceタイマー
+// v3.210: 「自作ならピッカーを5分刻みにして画面上で切り替えられないか」
+// との提案を受けて追加。±ボタン（+1/+5/+30、今ある時刻から少しずらす用）
+// は残したまま、分の列だけ1分／5分で切り替えられるようにする——ざっくり
+// 選ぶときは5分刻みの方が目的の時刻までのスクロール量が少なく速い。
+// セッション中は選んだ刻みを覚えておく（db保存までは不要な軽い好みのため）。
+let twMinStep = 1;
 
 // 開く時点の初期値: (1) 既に値があればそれ、(2) 終了欄で開始欄に値があれば
 // それ、(3) どちらも無ければ現在時刻。
@@ -1434,22 +1453,33 @@ function twInitialValue(inputId){
   return fmtNowTime();
 }
 
-function twBuildCol(colEl, max, current){
+// stepを省略（または1）すると、これまで通り0..maxの全整数を並べる。
+// step>1のときは0,step,step*2,...（maxを超えない範囲）だけを並べ、
+// data-vには実際の値（例: 40）を、スクロール位置はその「何番目か」
+// （例: 40/5=8番目）で計算する——1列の中で刻みが変わっても、
+// 「中央=選択中」という仕組み自体は共通にできる。
+function twBuildCol(colEl, max, current, step){
+  step = step || 1;
+  const count = Math.floor(max / step) + 1;
   let html = "";
   for(let i=0;i<TW_PAD;i++) html += `<div class="tw-item tw-spacer"></div>`;
-  for(let i=0;i<=max;i++) html += `<div class="tw-item" data-v="${i}">${pad(i)}</div>`;
+  for(let i=0;i<count;i++){
+    const val = i * step;
+    html += `<div class="tw-item" data-v="${val}">${pad(val)}</div>`;
+  }
   for(let i=0;i<TW_PAD;i++) html += `<div class="tw-item tw-spacer"></div>`;
   colEl.innerHTML = html;
-  colEl.scrollTop = current * TW_ITEM_H;   // アニメーション無しで即座にその位置へ——
-                                            // ネイティブピッカーの初期化タイミングに
-                                            // 左右されない、この実装の核心部分。
-  twMarkSelected(colEl, current);
+  const idx = Math.max(0, Math.min(count - 1, Math.round(current / step)));
+  colEl.scrollTop = idx * TW_ITEM_H;   // アニメーション無しで即座にその位置へ——
+                                        // ネイティブピッカーの初期化タイミングに
+                                        // 左右されない、この実装の核心部分。
+  twMarkSelected(colEl, idx * step);
 }
 
-function twMarkSelected(colEl, idx){
+function twMarkSelected(colEl, val){
   const prev = colEl.querySelector(".tw-item.tw-sel");
   if(prev) prev.classList.remove("tw-sel");
-  const cur = colEl.querySelector(`.tw-item[data-v="${idx}"]`);
+  const cur = colEl.querySelector(`.tw-item[data-v="${val}"]`);
   if(cur) cur.classList.add("tw-sel");
 }
 
@@ -1461,17 +1491,28 @@ function twCurrentSelection(){
   const hourCol = document.getElementById("twHourCol");
   const minCol = document.getElementById("twMinCol");
   const hh = Math.max(0, Math.min(23, Math.round(hourCol.scrollTop / TW_ITEM_H)));
-  const mm = Math.max(0, Math.min(59, Math.round(minCol.scrollTop / TW_ITEM_H)));
-  return pad(hh) + ":" + pad(mm);
+  const mCount = Math.floor(59 / twMinStep) + 1;
+  const mIdx = Math.max(0, Math.min(mCount - 1, Math.round(minCol.scrollTop / TW_ITEM_H)));
+  return pad(hh) + ":" + pad(mIdx * twMinStep);
 }
 
-function twOnScroll(colEl, max){
+function twOnScroll(colEl, max, step){
+  step = step || 1;
   clearTimeout(twScrollTimers[colEl.id]);
   twScrollTimers[colEl.id] = setTimeout(()=>{
-    const idx = Math.max(0, Math.min(max, Math.round(colEl.scrollTop / TW_ITEM_H)));
+    const count = Math.floor(max / step) + 1;
+    const idx = Math.max(0, Math.min(count - 1, Math.round(colEl.scrollTop / TW_ITEM_H)));
     colEl.scrollTop = idx * TW_ITEM_H;   // 吸着位置に正確にスナップし直す
-    twMarkSelected(colEl, idx);
+    twMarkSelected(colEl, idx * step);
   }, 110);
+}
+
+function twSyncMinToggleUI(){
+  const wrap = document.getElementById("twMinToggle");
+  if(!wrap || !wrap.querySelectorAll) return;
+  [...wrap.querySelectorAll(".tw-min-btn")].forEach(b=>{
+    b.classList.toggle("on", +b.dataset.v === twMinStep);
+  });
 }
 
 function openTimeWheel(inputId, label){
@@ -1487,10 +1528,26 @@ function openTimeWheel(inputId, label){
   const [hh, mm] = twInitialValue(inputId).split(":").map(Number);
   const hourCol = document.getElementById("twHourCol");
   const minCol = document.getElementById("twMinCol");
-  twBuildCol(hourCol, 23, hh);
-  twBuildCol(minCol, 59, mm);
-  hourCol.onscroll = () => twOnScroll(hourCol, 23);
-  minCol.onscroll = () => twOnScroll(minCol, 59);
+  twBuildCol(hourCol, 23, hh, 1);
+  twBuildCol(minCol, 59, mm, twMinStep);
+  hourCol.onscroll = () => twOnScroll(hourCol, 23, 1);
+  minCol.onscroll = () => twOnScroll(minCol, 59, twMinStep);
+  twSyncMinToggleUI();
+}
+
+// 分の刻みを切り替えるトグル（1分/5分）。今選んでいる分を新しい刻みに
+// 丸めて（例: 1分刻みで42分 → 5分刻みに切り替えると40分）、列を
+// 組み立て直す——切り替えた瞬間に表示がガクッと0分へ戻ったりしないように。
+function setTwMinStep(step){
+  const minCol = document.getElementById("twMinCol");
+  const oldStep = twMinStep;
+  const oldCount = Math.floor(59 / oldStep) + 1;
+  const oldIdx = Math.max(0, Math.min(oldCount - 1, Math.round(minCol.scrollTop / TW_ITEM_H)));
+  const curMin = oldIdx * oldStep;
+  twMinStep = step;
+  twBuildCol(minCol, 59, curMin, twMinStep);
+  minCol.onscroll = () => twOnScroll(minCol, 59, twMinStep);
+  twSyncMinToggleUI();
 }
 
 function confirmTimeWheel(){
@@ -4759,6 +4816,7 @@ document.addEventListener("click", e=>{
     case "open-time-wheel": openTimeWheel(id, el.dataset.label); break;
     case "tw-ok": confirmTimeWheel(); break;
     case "tw-cancel": closeTimeWheel(); break;
+    case "tw-min-step": setTwMinStep(+v); break;
     // v3.158: 開始・終了それぞれの時刻入力の脇にある移動ボタン。
     // render()は呼ばない——入力中の他の項目を消さないため。
     // v3.180: 「＋／－の方向トグル」＋「1/5/30分」の組み合わせに変更
