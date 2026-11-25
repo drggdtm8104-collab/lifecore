@@ -1213,7 +1213,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.212";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.213";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1359,7 +1359,7 @@ const CONTAMINATED_TASK_IDS = new Set([
 // 定義より前の行からは参照できない）。
 const byCreated = (a,b) => (a.createdAt||"").localeCompare(b.createdAt||"");
 let db = loadLocal();
-let state = { tab:"today", todayView:"timeline", tplView:"timeline", tasksView:"single", taskSort:"default", pickView:"single", pickSort:"default", tplPickView:"single", tplPickSort:"default", noteId:null, notesView:"notes", date: todayStr(), histSpan:"day", histDate: todayStr(), histView:"records", settingsTplId:null, _setOpen:new Set(), _noteOpen:new Set(), _tplDraft:null, _highlightOccId:null, _notePopoutId:null, _pickReturn:false };
+let state = { tab:"today", todayView:"timeline", tplView:"timeline", tasksView:"single", taskSort:"default", pickView:"single", pickSort:"default", tplPickView:"single", tplPickSort:"default", noteId:null, notesView:"remarks", date: todayStr(), histSpan:"day", histDate: todayStr(), histView:"records", settingsTplId:null, _setOpen:new Set(), _noteOpen:new Set(), _tplDraft:null, _highlightOccId:null, _notePopoutId:null, _pickReturn:false };
 
 let DB = null;                // Artifact DB namespace, or null (offline / not on claude.ai)
 let dbReady = false;
@@ -3520,7 +3520,12 @@ function newNote(){
 }
 
 function renderNotes(){
-  const notesView = state.notesView === "remarks" ? "remarks" : "notes";
+  // v3.213: メモタブを開いたときの既定サブビューを「メモ」から「覚え書き」に
+  // 変更——「覚え書き・メモどちらもしっかり見れていない、特に覚え書きを
+  // 目に入りやすくしたい」との指示。state.notesViewの初期値（上のstate定義）
+  // も合わせて"remarks"に変更したが、保険としてここのフォールバックも
+  // "notes"側ではなく"remarks"側にしておく。
+  const notesView = state.notesView === "notes" ? "notes" : "remarks";
   const list = [...(db.notes || [])].sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
   const open = state.noteId ? list.find(n=>n.id===state.noteId) : null;
   if(state.noteId && !open) state.noteId = null;   // it was deleted
