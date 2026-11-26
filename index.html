@@ -1213,7 +1213,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.213";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.214";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -4856,14 +4856,14 @@ document.addEventListener("click", e=>{
       const delta = sign * (parseInt(v, 10) || 0);
       const total = ((hh*60 + mm + delta) % 1440 + 1440) % 1440;
       inp.value = pad(Math.floor(total/60)) + ":" + pad(total%60);
-      // v3.205: 開始欄をこのボタンで動かした時、対になる終了欄
-      // （例: mkStart→mkEnd）がまだ空欄なら、開始時刻を既定値として
-      // 入れておく——change イベントは発火しないため、ここでも明示的に
-      // 伝える必要がある（下のdocument"change"/"input"リスナーと同じ考え方）。
-      if(/Start$/.test(id)){
-        const endEl = document.getElementById(id.replace(/Start$/, "End"));
-        if(endEl && !endEl.value) endEl.value = inp.value;
-      }
+      // v3.214: ここに「開始欄をこのボタンで動かした時、対になる終了欄が
+      // 空欄なら開始時刻を終了欄にも書き込む」(v3.205) というコードが
+      // あったが、「開始の±ボタンを押しただけで終了欄が勝手に埋まり、
+      // 取り消すには終了クリアで開始も一緒に消すしかない」というバグの
+      // 報告で削除した。終了欄の初期値を開始欄から取る挙動自体は、
+      // 終了欄を実際に操作した時（twInitialValue()・下のEnd側time-step
+      // フォールバック＝v3.206）にだけ働くので変わらない——開始欄側を
+      // 操作しただけで終了欄の値を書き換えることは、もう無い。
       break;
     }
     case "time-step-sign": {
