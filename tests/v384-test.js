@@ -71,17 +71,30 @@ function check(name, cond){
 }
 
 // --- 1. sheetOccEdit: クリア button + full time clear ---
+// v3.215: クリアボタンのHTMLはclearTimeBtn()に共通化されたため、
+// sheetOccEdit自身のソースにはその呼び出し(clearTimeBtn(...))が
+// 現れる。clearTimeBtn()自体が">クリア<"を出すことは別途確認する。
 const srcOccEdit = sandbox.sheetOccEdit.toString();
-check("sheetOccEdit: button now labeled クリア (not 終了・所要をなしにする)", srcOccEdit.includes(">クリア<") && !srcOccEdit.includes("終了・所要をなしにする"));
+check("sheetOccEdit: uses the shared クリア button helper (not 終了・所要をなしにする)",
+  srcOccEdit.includes("clearTimeBtn(") && !srcOccEdit.includes("終了・所要をなしにする"));
+vm.runInContext(`globalThis.__clearTimeBtn = clearTimeBtn;`, sandbox);
+check("clearTimeBtn() renders a クリア button", sandbox.__clearTimeBtn("x").includes(">クリア<"));
 
-// dispatch oe-clear-span with all 3 fields filled -> should clear all 3
+// v3.215: 開始・終了を1つの「クリア」ボタンで一括消去する仕様
+// (oe-clear-span)はバグ報告を受けて撤去し、開始・終了それぞれ独立した
+// クリアボタン(clear-time-field, data-id=各欄)に置き換えた。片方だけを
+// クリアしても、もう片方の欄には影響しないことを確認する。
 const oeStart = getEl("oeStart"); oeStart.value = "09:00";
 const oeEnd = getEl("oeEnd"); oeEnd.value = "10:00";
-const btn1 = { dataset:{ act:"oe-clear-span" }, disabled:false };
+const btn1 = { dataset:{ act:"clear-time-field", id:"oeStart" }, disabled:false };
 const fakeEvent1 = { target: { closest: (sel) => sel === "[data-act]" ? btn1 : null } };
 clickListeners.forEach(fn => fn(fakeEvent1));
-check("oe-clear-span clears oeStart", oeStart.value === "");
-check("oe-clear-span clears oeEnd", oeEnd.value === "");
+check("clear-time-field(oeStart) clears only oeStart", oeStart.value === "");
+check("clear-time-field(oeStart) leaves oeEnd untouched", oeEnd.value === "10:00");
+const btn2 = { dataset:{ act:"clear-time-field", id:"oeEnd" }, disabled:false };
+const fakeEvent2 = { target: { closest: (sel) => sel === "[data-act]" ? btn2 : null } };
+clickListeners.forEach(fn => fn(fakeEvent2));
+check("clear-time-field(oeEnd) clears oeEnd", oeEnd.value === "");
 // v3.158: 所要時間の手入力欄(oeMin)自体を廃止したため、このチェックは撤去。
 
 // --- 2. cardHTML: editBtn moved to card-head, before statusHTML, only for listView ---

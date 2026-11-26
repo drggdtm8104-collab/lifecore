@@ -75,19 +75,21 @@ function check(name, cond){
 const srcAddOcc = sandbox.sheetAddOcc.toString();
 check("sheetAddOcc: no more 未定で追加 button", !srcAddOcc.includes("未定で追加"));
 check("sheetAddOcc: primary button renamed to タスクを追加", srcAddOcc.includes(">タスクを追加<"));
-check("sheetAddOcc: has ao-clear-time button", srcAddOcc.includes("ao-clear-time") && srcAddOcc.includes("クリア"));
+check("sheetAddOcc: has independent clear buttons for start/end",
+  srcAddOcc.includes('clearTimeBtn("aoStart")') && srcAddOcc.includes('clearTimeBtn("aoEnd")'));
 
 const srcTask = sandbox.sheetTask.toString();
 check("sheetTask: new-task title is タスクを登録", srcTask.includes("タスクを登録"));
 
-// dispatch ao-clear-time via real click handler
+// v3.215: ao-clear-time（開始・終了を一括で消す単一ボタン）はバグ報告を
+// 受けて撤去し、開始・終了それぞれ独立したclear-time-fieldに置き換えた。
 const aoStart = getEl("aoStart"); aoStart.value = "09:00";
 const aoEnd = getEl("aoEnd"); aoEnd.value = "10:00";
-const btn = { dataset:{ act:"ao-clear-time" }, disabled:false };
+const btn = { dataset:{ act:"clear-time-field", id:"aoStart" }, disabled:false };
 const fakeEvent = { target: { closest: (sel) => sel === "[data-act]" ? btn : null } };
 clickListeners.forEach(fn => fn(fakeEvent));
-check("ao-clear-time clears aoStart", aoStart.value === "");
-check("ao-clear-time clears aoEnd", aoEnd.value === "");
+check("clear-time-field(aoStart) clears only aoStart", aoStart.value === "");
+check("clear-time-field(aoStart) leaves aoEnd untouched", aoEnd.value === "10:00");
 // v3.158: 所要時間の手入力欄(aoMin)自体を廃止したため、このチェックは撤去。
 
 // dispatch add-today with blank time -> should behave like old "untimed"

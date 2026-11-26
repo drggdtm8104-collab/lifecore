@@ -1213,7 +1213,7 @@
    ============================================================ */
 
 const KEY = "lifecore.v1";
-const APP_VERSION = "3.214";   // shown in 設定 so we can tell which build each device is running
+const APP_VERSION = "3.215";   // shown in 設定 so we can tell which build each device is running
 /* v3.0 — model split: タスク (checkable, has history) vs 予定 (time context, no
    check). 食事 is now a 継続型 task. Templates hold 予定 rows + task placements.
    完了型 tasks gained 重要度 / 開始時期. Old data is upgraded by migrate(). */
@@ -1412,6 +1412,13 @@ const settings = () => (db.settings || (db.settings = {}));
 // （type="text"+readonly+inputmode="none"——キーボードも出さず、
 // 表示上の見た目は変えずに値だけ.value経由で読み書きする。time-step
 // 系の既存コードは.valueを読み書きするだけなので変更不要）。
+// v3.215: 開始・終了のどちらも独立して空欄にできるのに、終了欄側にだけ
+// 1つ「クリア」ボタンを置き、そのボタンで開始・終了の両方（または画面に
+// よっては終了だけ）を消す実装になっていた。「終了欄を直すつもりで
+// クリアを押したら開始まで消えた」というバグにつながったため、開始・終了
+// それぞれの行に、その欄だけを消す独立したクリアボタンを置けるようにした
+// （下のclearTimeBtn()）。
+const clearTimeBtn = (inputId) => `<button type="button" class="mini-clear" data-act="clear-time-field" data-id="${inputId}">クリア</button>`;
 function timeRow(label, inputId, value, extraHTML){
   return `<div class="time-stepper-row">
     <span class="ts-label">${esc(label)}</span>
@@ -3970,9 +3977,9 @@ function sheetTplTaskTime(taskId){
   if(!task) return;
   openSheet(`<h2>${esc(task.name)}</h2>
     <p class="sheet-sub">開始時刻を入れると時間割に置かれます。空欄なら「時間未定」で配置。</p>
-    <label class="fld"><span>開始 〜 終了（空欄可）</span></label>
-    ${timeRow("開始", "ttStart", "")}
-    ${timeRow("終了", "ttEnd", "", '<button type="button" class="mini-clear" data-act="tt-clear-time">クリア</button>')}
+    <label class="fld"><span>開始 〜 終了（どちらも空欄可）</span></label>
+    ${timeRow("開始", "ttStart", "", clearTimeBtn("ttStart"))}
+    ${timeRow("終了", "ttEnd", "", clearTimeBtn("ttEnd"))}
     <div class="sheet-actions">
       <button class="btn ghost" data-act="close-sheet">キャンセル</button>
       <button class="btn primary" data-act="tpl-task-confirm" data-id="${taskId}">追加</button>
@@ -3997,10 +4004,10 @@ function sheetTplPlanTime(){
   openSheet(`<h2>予定を追加</h2>
     <p class="sheet-sub">その時間なにをしているかの表示です。完了などのチェックはつきません（例: 美容院、来客、外出）。</p>
     <label class="fld"><span>内容</span><input type="text" id="tpName" placeholder="例: 仕事 / 睡眠"></label>
-    <label class="fld"><span>開始 〜 終了（空欄可）</span></label>
-    ${timeRow("開始", "tpStart", dflt)}
-    ${timeRow("終了", "tpEnd", "", '<button type="button" class="mini-clear" data-act="tp-clear-span">クリア</button>')}
-    <p class="sheet-sub" style="margin-top:2px">両方空欄なら「時点」の予定。</p>
+    <label class="fld"><span>開始 〜 終了（終了のみ空欄可。予定は開始時刻が必須）</span></label>
+    ${timeRow("開始", "tpStart", dflt, clearTimeBtn("tpStart"))}
+    ${timeRow("終了", "tpEnd", "", clearTimeBtn("tpEnd"))}
+    <p class="sheet-sub" style="margin-top:2px">終了が空欄なら「時点」の予定。</p>
     <label class="fld"><span>カテゴリ</span></label>
     <div class="radio-row" id="tpCat">
       ${CATS.map(c=>`<button data-v="${c}" class="${c==="その他"?"on":""}">${c}</button>`).join("")}
@@ -4102,9 +4109,9 @@ function sheetAddOcc(taskId){
   const t = db.tasks.find(x=>x.id===taskId); if(!t) return;
   openSheet(`<h2>${esc(t.name)}</h2>
     <p class="sheet-sub">開始時刻を入れると時間割に置かれます。空欄なら「時間未定」で追加。</p>
-    <label class="fld"><span>開始 〜 終了（空欄可）</span></label>
-    ${timeRow("開始", "aoStart", "")}
-    ${timeRow("終了", "aoEnd", "", '<button type="button" class="mini-clear" data-act="ao-clear-time">クリア</button>')}
+    <label class="fld"><span>開始 〜 終了（どちらも空欄可）</span></label>
+    ${timeRow("開始", "aoStart", "", clearTimeBtn("aoStart"))}
+    ${timeRow("終了", "aoEnd", "", clearTimeBtn("aoEnd"))}
     <div class="sheet-actions">
       <button class="btn ghost" data-act="close-sheet">キャンセル</button>
       <button class="btn primary" data-act="add-today" data-id="${taskId}">タスクを追加</button>
@@ -4227,10 +4234,10 @@ function sheetMarker(id){
   openSheet(`<h2>${m ? "予定を編集" : "予定を追加"}</h2>
     <p class="sheet-sub">その時間なにをしているかの表示です。完了などのチェックはつきません（例: 美容院、来客、外出）。この日だけに入ります。</p>
     <label class="fld"><span>内容</span><input type="text" id="mkName" value="${esc(m?.title||"")}" placeholder="例: 美容院"></label>
-    <label class="fld"><span>開始 〜 終了（空欄可）</span></label>
-    ${timeRow("開始", "mkStart", m?.plannedStart||"")}
-    ${timeRow("終了", "mkEnd", curEnd, '<button type="button" class="mini-clear" data-act="mk-clear-span">クリア</button>')}
-    <p class="sheet-sub" style="margin-top:2px">両方空欄なら「時点」の予定。</p>
+    <label class="fld"><span>開始 〜 終了（終了のみ空欄可。予定は開始時刻が必須）</span></label>
+    ${timeRow("開始", "mkStart", m?.plannedStart||"", clearTimeBtn("mkStart"))}
+    ${timeRow("終了", "mkEnd", curEnd, clearTimeBtn("mkEnd"))}
+    <p class="sheet-sub" style="margin-top:2px">終了が空欄なら「時点」の予定。</p>
     <label class="fld"><span>カテゴリ</span></label>
     <div class="radio-row" id="mkCat">
       ${CATS.map(c=>`<button data-v="${c}" class="${curCat===c?"on":""}">${c}</button>`).join("")}
@@ -4263,9 +4270,9 @@ function sheetOccEdit(id){
     ${isAdhoc
       ? `<label class="fld"><span>内容</span><input type="text" id="oeName" value="${esc(o.title||"")}"></label>`
       : `<p class="sheet-sub">タスク: ${esc(t?.name || "(削除済み)")}</p>`}
-    <label class="fld"><span>開始 〜 終了（開始は空欄可）</span></label>
-    ${timeRow("開始", "oeStart", o.plannedStart||"")}
-    ${timeRow("終了", "oeEnd", curEnd, '<button type="button" class="mini-clear" data-act="oe-clear-span">クリア</button>')}
+    <label class="fld"><span>開始 〜 終了（どちらも空欄可）</span></label>
+    ${timeRow("開始", "oeStart", o.plannedStart||"", clearTimeBtn("oeStart"))}
+    ${timeRow("終了", "oeEnd", curEnd, clearTimeBtn("oeEnd"))}
     <p class="sheet-sub" style="margin-top:2px">全部空欄なら「時間未定」になる。</p>
     ${t ? `<label class="fld"><span>備考（任意・タスクの説明）</span>${noteTextarea("oeTaskNote", t.note, "手順・持ち物・詳細など")}</label>` : ""}
     <label class="fld"><span>進捗メモ（任意）</span>${noteTextarea("oeNote", o.note, "例: 第3章まで／下書きだけ・補足など")}</label>
@@ -4290,9 +4297,9 @@ function sheetQuickRun(taskId){
   const t = db.tasks.find(x=>x.id===taskId); if(!t) return;
   openSheet(`<h2>${esc(t.name)} を実行</h2>
     <p class="sheet-sub">予定外にやった分を、その場で完了として記録します。開始・終了・進捗メモはすべて任意です。</p>
-    <label class="fld"><span>開始 〜 終了（空欄可）</span></label>
-    ${timeRow("開始", "qrStart", "")}
-    ${timeRow("終了", "qrEnd", "", '<button type="button" class="mini-clear" data-act="qr-clear-span">クリア</button>')}
+    <label class="fld"><span>開始 〜 終了（どちらも空欄可）</span></label>
+    ${timeRow("開始", "qrStart", "", clearTimeBtn("qrStart"))}
+    ${timeRow("終了", "qrEnd", "", clearTimeBtn("qrEnd"))}
     <label class="fld"><span>進捗メモ（任意）</span>${noteTextarea("qrNote", "", "例: 1セットだけ／途中まで など")}</label>
     <div class="sheet-actions">
       <button class="btn ghost" data-act="close-sheet">キャンセル</button>
@@ -4659,11 +4666,6 @@ document.addEventListener("click", e=>{
       break;
     }
     case "edit-marker": sheetMarker(id); break;
-    case "mk-clear-span": {
-      const e = document.getElementById("mkEnd");
-      if(e) e.value = "";
-      break;
-    }
     case "save-marker": {
       const name = (document.getElementById("mkName").value||"").trim();
       if(!name){ document.getElementById("mkName").focus(); break; }
@@ -4725,11 +4727,6 @@ document.addEventListener("click", e=>{
     // v3.175: 「ToDoリストに追加」の候補一覧から選んだ場合は、追加後に続けて
     // 選びやすいよう候補一覧へ戻す（下のcase "add-today"参照）。
     case "pick-add": state._pickReturn = true; sheetAddOcc(id); break;
-    case "ao-clear-time": {
-      const s = document.getElementById("aoStart"), e = document.getElementById("aoEnd");
-      if(s) s.value = ""; if(e) e.value = "";
-      break;
-    }
     case "add-today": {
       const t = db.tasks.find(x=>x.id===id); if(!t) break;
       // 見ている日が過去でも未来でも扱いは統一（自動で実施済みにはしない）。
@@ -4815,10 +4812,16 @@ document.addEventListener("click", e=>{
       save(); render(); break;
     }
     case "edit-occ": case "set-time": sheetOccEdit(id); break;
-    case "oe-clear-span": {
-      const s = document.getElementById("oeStart"), e = document.getElementById("oeEnd");
-      if(s) s.value = ""; if(e) e.value = "";
-      toast("時間をクリアしました（保存で確定）");
+    // v3.215: 開始・終了それぞれの行にある、その欄だけを消す「クリア」
+    // ボタン（timeRow()のclearTimeBtn()参照）。以前はoe-clear-span・
+    // mk-clear-span・ao-clear-time・qr-clear-span・tp-clear-span・
+    // tt-clear-timeという画面ごとの個別アクションで、開始・終了セット
+    // （または終了だけ）を一括で消す実装だった——同じ仕組みを使う画面
+    // 全てをこの1つのアクションに統合し、どの画面でも開始・終了を
+    // それぞれ独立して消せるようにした。
+    case "clear-time-field": {
+      const inp = document.getElementById(id);
+      if(inp) inp.value = "";
       break;
     }
     // v3.208: 時刻欄（timeRow()由来、.ts-input）をタップした時に開く、
@@ -4904,12 +4907,6 @@ document.addEventListener("click", e=>{
     }
 
     case "quick-run": sheetQuickRun(id); break;
-    case "qr-clear-span": {
-      const s = document.getElementById("qrStart"), e = document.getElementById("qrEnd");
-      if(s) s.value = ""; if(e) e.value = "";
-      toast("時間をクリアしました（完了するで確定）");
-      break;
-    }
     // v3.196: 「完了する」— その場で完了ずみのoccurrenceを1件作る。
     // toggle-occ-doneの完了側と同じ考え方で、所要時間が空欄ならplannedMin→
     // estMinの順で補う。adhoc:trueにして「予定外」のメタ表示（既存の
@@ -5130,11 +5127,6 @@ document.addEventListener("click", e=>{
       sortBlocks(draft.plans);
       closeSheet(); render(); break;
     }
-    case "tp-clear-span": {
-      const e = document.getElementById("tpEnd");
-      if(e) e.value = "";
-      break;
-    }
     case "tpl-del-row": {
       readTplEditor();
       const draft = state._tplDraft; if(!draft) break;
@@ -5156,11 +5148,6 @@ document.addEventListener("click", e=>{
     case "tpl-pick-view": { state.tplPickView = v; sheetTplTaskPick(); break; }
     case "tpl-pick-sort": { state.tplPickSort = v; sheetTplTaskPick(); break; }
     case "tpl-task-pick": sheetTplTaskTime(id); break;
-    case "tt-clear-time": {
-      const s = document.getElementById("ttStart"), e = document.getElementById("ttEnd");
-      if(s) s.value = ""; if(e) e.value = "";
-      break;
-    }
     case "tpl-task-confirm": {
       const draft = state._tplDraft; if(!draft) break;
       const t = db.tasks.find(x=>x.id===id);
